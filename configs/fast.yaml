@@ -1,0 +1,20 @@
+# FAST: demo ~5 phút trên T4 (hoặc CPU ~10 phút). Dùng để check pipeline + slide demo live.
+# Story demo (đã verify seed 0-2 @500 steps): ERM ổn định sụp OOD (test ~0.22),
+# REx hồi phục ổn định (test ~0.5-0.7), IRMv1 phương sai lớn theo seed (finding, khớp literature).
+data:
+  data_dir: data
+  label_noise: 0.25
+  seed: 0
+  batch_size: 2048
+  dataset: mnist
+model: mlp
+train:
+  steps: 500
+  lr: 0.001
+  anneal_steps: 190
+  log_every: 500
+  seeds: [0]
+methods:
+  erm: {penalty_weight: 0.0}
+  irm: {penalty_weight: 10000.0}
+  rex: {rex_beta: 1000.0}

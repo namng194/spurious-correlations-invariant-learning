@@ -1,0 +1,26 @@
+# HEAVY: chương trình full ~4-6h T4 (solo vẫn kham được, chạy qua đêm).
+# run_sweep.py dùng: methods x seeds. ablate.py dùng: lambda_sweep, backbones, failures.
+data:
+  data_dir: data
+  label_noise: 0.25
+  seed: 0
+  batch_size: 2048
+  dataset: mnist
+model: mlp
+train:
+  steps: 2000
+  lr: 0.001
+  anneal_steps: 190
+  log_every: 200
+  seeds: [0, 1, 2]
+methods:
+  erm: {penalty_weight: 0.0}
+  irm: {penalty_weight: 10000.0}
+  rex: {rex_beta: 1000.0}
+  groupdro: {}
+ablate:
+  lambda_sweep: [100.0, 1000.0, 10000.0, 30000.0]
+  backbones: [mlp, cnn]
+  patch_p_e: 0.1        # spurious thứ 2 cho failure demo E <= |Psi_s|
+  small_n: 6250         # sample-size ablation per env
+  second_dataset: fashion  # Colored-FashionMNIST cross-dataset check
