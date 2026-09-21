@@ -1,0 +1,16 @@
+data:
+  data_dir: data
+  label_noise: 0.25
+  seed: 0
+  batch_size: 2048
+model: mlp
+train:
+  steps: 2000
+  lr: 0.001
+  anneal_steps: 190
+  log_every: 200
+  seeds: [0, 1, 2]
+methods:
+  erm: {penalty_weight: 0.0}
+  irm: {penalty_weight: 10000.0}
+  rex: {rex_beta: 1000.0}
