@@ -20,6 +20,7 @@ methods:
   groupdro: {}
 ablate:
   lambda_sweep: [100.0, 1000.0, 10000.0, 30000.0]
+  rex_beta_sweep: [100.0, 1000.0, 10000.0]
   backbones: [mlp, cnn]
   patch_p_e: 0.1        # spurious thứ 2 cho failure demo E <= |Psi_s|
   small_n: 6250         # sample-size ablation per env

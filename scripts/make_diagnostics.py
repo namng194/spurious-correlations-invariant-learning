@@ -22,10 +22,10 @@ import yaml
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from cmnist.data import build_colored_mnist, to_loader  # noqa: E402
-from cmnist.eval import collect  # noqa: E402
+from cmnist.eval import collect, expected_calibration_error  # noqa: E402
 from cmnist.models import make_model  # noqa: E402
 from cmnist.train import train_one_run  # noqa: E402
-from cmnist.viz import reliability_diagram, saliency  # noqa: E402
+from cmnist.viz import integrated_gradients, reliability_diagram, saliency  # noqa: E402
 
 
 def main():
@@ -54,44 +54,52 @@ def main():
         )
         models[method] = res["model"]
 
-    # 1) reliability diagrams trên OOD test
+    # 1) reliability diagrams on OOD test + ECE values
+    import json
+
+    ece = {}
     for method, model in models.items():
         p, y, _ = collect(model, loaders["test"], device)
         reliability_diagram(p.numpy(), y.numpy(),
                             path=os.path.join(args.out, f"reliability_{method}.png"))
         plt.close("all")
-    print("saved reliability_*.png")
+        ece[method] = expected_calibration_error(p, y)
+    print(f"saved reliability_*.png ECE={ece}")
 
-    # 2) saliency grid 4 ảnh test: ERM vs IRM
+    # 2) attribution grid: vanilla saliency + Integrated Gradients, ERM vs IRM
     x4 = envs["test"]["x"][:4]
-    fig, axes = plt.subplots(2, 4, figsize=(10, 5))
-    for j in range(4):
-        axes[0, j].imshow(x4[j].permute(1, 2, 0).numpy())
-        axes[0, j].set_title(f"input y={int(envs['test']['y'][j])}")
-        axes[0, j].axis("off")
-        s_erm = saliency(models["erm"], x4[j], device)
-        s_irm = saliency(models["irm"], x4[j], device)
-        axes[1, j].imshow(np.concatenate([s_erm, s_irm], axis=1), cmap="hot")
-        axes[1, j].set_title("top:ERM-sal bottom:IRM-sal")
-        axes[1, j].axis("off")
-    # vẽ lại đúng: hàng 1 ERM, hàng 2 IRM
-    fig.clear()
     fig, axes = plt.subplots(2, 4, figsize=(10, 5))
     for j in range(4):
         for i, m in enumerate(("erm", "irm")):
             s = saliency(models[m], x4[j], device)
             axes[i, j].imshow(x4[j].permute(1, 2, 0).numpy(), alpha=0.4)
             axes[i, j].imshow(s, cmap="hot", alpha=0.6)
-            axes[i, j].set_title(f"{m} y={int(envs['test']['y'][j])}")
+            axes[i, j].set_title(f"{m} sal y={int(envs['test']['y'][j])}")
             axes[i, j].axis("off")
+    fig.suptitle("Vanilla-gradient saliency (baseline; sanity-check caveat)")
     fig.tight_layout()
     fig.savefig(os.path.join(args.out, "saliency_erm_vs_irm.png"), dpi=150)
     plt.close("all")
     print("saved saliency_erm_vs_irm.png")
 
-    # 3) linear probe: màu decodable từ feature?
+    fig, axes = plt.subplots(2, 4, figsize=(10, 5))
+    for j in range(4):
+        for i, m in enumerate(("erm", "irm")):
+            s = integrated_gradients(models[m], x4[j], device, steps=32)
+            axes[i, j].imshow(x4[j].permute(1, 2, 0).numpy(), alpha=0.4)
+            axes[i, j].imshow(s, cmap="hot", alpha=0.6)
+            axes[i, j].set_title(f"{m} IG y={int(envs['test']['y'][j])}")
+            axes[i, j].axis("off")
+    fig.suptitle("Integrated Gradients (primary XAI evidence)")
+    fig.tight_layout()
+    fig.savefig(os.path.join(args.out, "ig_erm_vs_irm.png"), dpi=150)
+    plt.close("all")
+    print("saved ig_erm_vs_irm.png")
+
+    # 3) linear probe: is color decodable from features? (DFR head-only hypothesis)
     from sklearn.linear_model import LogisticRegression
 
+    probe = {"ece": ece}
     for method, model in models.items():
         feats, _, colors = [], [], []
         model.eval()
@@ -106,9 +114,12 @@ def main():
         cut = len(idx) // 2
         tr, te = idx[:cut], idx[cut:]
         clf = LogisticRegression(max_iter=200).fit(X[tr], Cc[tr])
-        print(f"probe color-decodability {method}: train={clf.score(X[tr], Cc[tr]):.3f} "
-              f"heldout={clf.score(X[te], Cc[te]):.3f} "
-              f"(thấp = representation đã bỏ màu spurious)")
+        probe[method] = {"train": float(clf.score(X[tr], Cc[tr])),
+                         "heldout": float(clf.score(X[te], Cc[te]))}
+        print(f"probe color-decodability {method}: train={probe[method]['train']:.3f} "
+              f"heldout={probe[method]['heldout']:.3f} "
+              f"(high = color retained in representation, consistent with DFR)")
+    json.dump(probe, open(os.path.join(args.out, "diagnostics.json"), "w"), indent=2)
 
 
 if __name__ == "__main__":

@@ -57,7 +57,12 @@ def train_one_run(
             iters[i] = iter(train_loaders[i])
             return next(iters[i])
 
+    def _snapshot(m):
+        return {k: v.detach().cpu().clone() for k, v in m.state_dict().items()}
+
     hist: list[dict] = []
+    best_id_acc, best_ood_acc = -1.0, -1.0
+    best_id_state, best_ood_state = None, None
     for step in range(1, steps + 1):
         model.train()
         logits_e, y_e = [], []
@@ -77,5 +82,19 @@ def train_one_run(
                    **{k: (v.item() if torch.is_tensor(v) else v) for k, v in info.items()}}
             for name, loader in val_loaders.items():
                 rec[f"acc_{name}"] = env_accuracy(model, loader, device)
+            # Honest model selection (DomainBed): train-domain validation =
+            # mean accuracy over training envs; OOD oracle = test accuracy.
+            id_avg = float(sum(rec.get(f"acc_{k}", float("nan"))
+                               for k in ("train_e1", "train_e2") if f"acc_{k}" in rec) / 2)
+            ood = float(rec.get("acc_test", float("nan")))
+            rec["id_avg"] = id_avg
+            if id_avg == id_avg and id_avg > best_id_acc:
+                best_id_acc = id_avg
+                best_id_state = _snapshot(model)
+            if ood == ood and ood > best_ood_acc:
+                best_ood_acc = ood
+                best_ood_state = _snapshot(model)
             hist.append(rec)
-    return {"model": model, "history": hist}
+    return {"model": model, "history": hist,
+            "best_id_state": best_id_state, "best_id_acc": best_id_acc,
+            "best_ood_state": best_ood_state, "best_ood_acc": best_ood_acc}

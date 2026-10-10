@@ -61,18 +61,35 @@ def main():
                 anneal_steps=cfg["train"]["anneal_steps"],
                 rex_beta=float(mcfg.get("rex_beta", 1e3)),
                 device=device,
-                log_every=steps,
+                log_every=cfg["train"].get("log_every", 200),
                 seed=seed,
             )
-            summ = summarize(res["model"], loaders, device)
-            row = {"method": method, "seed": seed,
-                   "train_acc": (summ["train_e1"]["acc"] + summ["train_e2"]["acc"]) / 2,
-                   "test_acc": summ["test"]["acc"],
-                   "ood_gap": summ.get("ood_gap", float("nan")),
-                   "test_worst": summ["test"]["worst"],
-                   "test_ece": summ["test"]["ece"]}
-            rows.append(row)
-            print(f"  -> {row}", flush=True)
+            # Two model-selection protocols (DomainBed): last checkpoint vs
+            # train-domain-validation (best ID avg) vs OOD oracle (best test).
+            import copy
+
+            base_model = make_model(cfg["model"])
+            evals = {}
+            evals["last"] = summarize(res["model"], loaders, device)
+            if res["best_id_state"] is not None:
+                base_model.load_state_dict(
+                    {k: v for k, v in res["best_id_state"].items()})
+                base_model.to(device)
+                evals["trainval"] = summarize(base_model, loaders, device)
+            if res["best_ood_state"] is not None:
+                base_model.load_state_dict(
+                    {k: v for k, v in res["best_ood_state"].items()})
+                base_model.to(device)
+                evals["oracle"] = summarize(base_model, loaders, device)
+            for proto, summ in evals.items():
+                row = {"method": method, "seed": seed, "protocol": proto,
+                       "train_acc": (summ["train_e1"]["acc"] + summ["train_e2"]["acc"]) / 2,
+                       "test_acc": summ["test"]["acc"],
+                       "ood_gap": summ.get("ood_gap", float("nan")),
+                       "test_worst": summ["test"]["worst"],
+                       "test_ece": summ["test"]["ece"]}
+                rows.append(row)
+                print(f"  -> [{proto}] {row}", flush=True)
 
     json.dump(rows, open(os.path.join(args.out, "results.json"), "w"), indent=2)
     with open(os.path.join(args.out, "results.csv"), "w", newline="") as f:
