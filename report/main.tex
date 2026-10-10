@@ -201,8 +201,29 @@ Method & Train (ID avg) & Test (OOD) & OOD gap & Worst group & ECE \\
 \end{figure}
 
 \paragraph{Model-selection honesty.}
-We additionally report the OOD-oracle protocol to quantify how much peeking at the test
-distribution inflates IRM (DomainBed critique); the gap between protocols is itself a finding.
+Table~\ref{tab:proto} contrasts train-domain validation (honest) with the OOD oracle
+(peeking at the test distribution, \cite{domainbed2021}).
+IRM's advantage lives entirely in the oracle column: under honest selection IRM collapses
+($0.243\pm0.172$) while V-REx is the stable winner ($0.424\pm0.014$).
+Reporting only oracle/last checkpoints inflates IRM by $+0.55$ --- the central
+methodological lesson of this project.
+
+\begin{table}[H]
+\centering
+\caption{Model-selection protocol matters (test OOD acc, mean$\pm$std, 3 seeds).
+\texttt{trainval} = checkpoint maximizing ID-avg (honest, primary);
+\texttt{oracle} = maximizing test acc (reference); \texttt{last} = final checkpoint.}
+\label{tab:proto}
+\begin{tabular}{lccc}
+\toprule
+Method & trainval (honest) & oracle (peek) & last \\
+\midrule
+ERM & $0.315\pm0.010$ & $0.331\pm0.024$ & $0.304\pm0.014$ \\
+IRMv1 ($\lambda{=}10^4$) & $0.243\pm0.172$ & $0.799\pm0.030$ & $0.754\pm0.109$ \\
+V-REx ($\beta{=}10^3$) & $0.424\pm0.014$ & $0.563\pm0.045$ & $0.439\pm0.028$ \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Ablations (RQ2)}
 Table~\ref{tab:ablate} aggregates the heavy program (train-domain validation, 3 seeds).
