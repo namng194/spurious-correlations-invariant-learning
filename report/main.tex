@@ -38,7 +38,7 @@
 Student: & (name / ID) \\
 Program: & M.S.\ Data Science \\
 Supervisor: & (supervisor name, title) \\
-Hardware: & NVIDIA RTX 3080 10\,GB \\
+Hardware: & NVIDIA T4 16\,GB (Colab) \\
 \end{tabular}
 \vfill
 \rule{\linewidth}{0.8pt}
@@ -57,7 +57,7 @@ IRMv1 recovers OOD accuracy only when the checkpoint is selected by peeking at t
 distribution ($0.799\pm0.030$ oracle) and collapses under honest selection
 ($0.243\pm0.172$); V-REx is the stable alternative ($0.424\pm0.014$ trainval,
 $0.457\pm0.001$ at $\beta=10^4$).
-An 18-case ablation program shows IRM is insensitive to $\lambda$ but bimodal in seed,
+An 18-case ablation suite shows IRM is insensitive to $\lambda$ but bimodal in seed,
 fails with a single environment, collapses to ERM level once a second spurious feature
 appears, and transfers to Colored-FashionMNIST. Calibration, Integrated Gradients, and a
 linear color-probe (decodability $1.00$ for both ERM and IRM) complete the diagnosis:
@@ -98,7 +98,7 @@ calibration, attributions, or representation probes?
 \textbf{Contributions.}
 (1) A mean$\pm$std comparison (3 seeds) of ERM / IRMv1 / V-REx under two model-selection
 protocols, train-domain validation vs.\ OOD oracle \citep{domainbed2021}.
-(2) An 18-case ablation program: IRM-$\lambda$-sweep, REx-$\beta$-sweep, MLP vs.\ CNN,
+(2) An 18-case ablation suite: IRM-$\lambda$-sweep, REx-$\beta$-sweep, MLP vs.\ CNN,
 single-environment, second spurious patch, small-$n$, and Colored-FashionMNIST transfer.
 (3) Reliability / Integrated-Gradients / linear-probe diagnostics linking the Reliability
 and Explainability pillars of trustworthy AI.
@@ -111,8 +111,7 @@ and Explainability pillars of trustworthy AI.
 \citet{arjovsky2019irm} learn a representation $\Phi$ such that a single classifier $w$
 is simultaneously optimal in all training environments. The practical relaxation IRMv1
 adds a gradient penalty (see \S\ref{sec:problem}). Follow-ups show IRMv1 is seed- and
-$\lambda$-sensitive and propose games \citep{irmgames2020}, gradient-variance penalties
-(Fishr, \cite{rame2022fishr}), and sparsity \citep{zhou2022sparseirm}.
+$\lambda$-sensitive and propose games \citep{irmgames2020}, gradient-variance penalties (Fishr, \citealt{rame2022fishr}), and sparsity \citep{zhou2022sparseirm}.
 
 \paragraph{Risk Extrapolation (REx) and Group DRO.}
 V-REx \citep{krueger2021rex} penalizes the variance of risks across environments:
@@ -132,8 +131,7 @@ DomainBed \citep{domainbed2021}, WILDS \citep{koh2021wilds}, and SubpopBench
 \citet{kirichenko2022dfr} (DFR) and \citet{liu2021jtt} (JTT) show core features are often
 learned but mis-weighted in the head, motivating our linear color-probe. For
 explainability we use Integrated Gradients \citep{sundararajan2017ig} as primary
-evidence; vanilla saliency fails sanity checks \citep{adebayo2018sanity} and is kept as
-baseline only.
+evidence; vanilla saliency fails sanity checks \citep{adebayo2018sanity} and is kept as baseline only (\S\ref{sec:experiments}).
 
 % ============================================================
 \section{Problem Formulation}
@@ -164,17 +162,8 @@ cross-entropy $\ell$. With per-env risks $R^e$:
 \text{GroupDRO-lite:} \quad & \min_\theta \max_e R^e(\theta).
 \end{align}
 The dummy-classifier trick ($w=1.0$) makes the IRM penalty first-order differentiable.
-
-\paragraph{Metrics and model selection.}
-For the test environment with groups $g=(y,c) \in \{0,1\}^2$:
-ID-avg $= (\mathrm{Acc}_{e_1}+\mathrm{Acc}_{e_2})/2$;
-OOD accuracy $= \mathrm{Acc}_{\mathrm{te}}$;
-OOD gap $=$ ID-avg $-$ OOD;
-worst-group $= \min_g \mathrm{Acc}_g$ (a coarse equalized-odds proxy);
-ECE with 15 bins.
-Primary protocol is \textbf{train-domain validation} (checkpoint maximizing ID-avg);
-the \textbf{OOD oracle} (maximizing test accuracy) is reported as reference to quantify
-selection bias. All numbers are mean$\pm$std over 3 seeds unless stated otherwise.
+Metrics, dataset sizes, and the model-selection protocol used for all experiments are
+described in \S\ref{subsec:protocol}.
 
 % ============================================================
 \section{Method}
@@ -186,6 +175,8 @@ selection bias. All numbers are mean$\pm$std over 3 seeds unless stated otherwis
 optional $3\times3$ patch spurious); \texttt{models.py} gives an MLP ($2\times256$)
 and a small CNN; \texttt{losses.py} implements ERM/IRMv1/V-REx/GroupDRO-lite;
 \texttt{train.py} runs Adam ($lr=10^{-3}$, batch 2048, 2000 steps) with penalty annealing
+(below the annealing threshold of 190 steps the penalty weight is $0$, so every method
+temporarily degenerates to ERM)
 and records best-ID / best-OOD checkpoints; \texttt{eval.py} reports per-env accuracy,
 worst-group, gap, and ECE.
 
@@ -193,13 +184,48 @@ worst-group, gap, and ECE.
 \texttt{fast} (500 steps, 1 seed, pipeline demo), \texttt{base} (2000 steps $\times$
 ERM/IRM/REx $\times$ 3 seeds, main comparison), \texttt{heavy} (penalty sweeps +
 backbones + failure variants + FashionMNIST transfer, 54 runs total).
-Total compute was $\approx$ 3\,h on an RTX 3080 (10\,GB); deterministic cuDNN,
-seeds $\{0,1,2\}$. Below the annealing threshold (190 steps) every method degenerates
-to ERM.
+Total compute was $\approx$ 3\,h of GPU time on a Colab T4 (16\,GB); deterministic cuDNN,
+seeds $\{0,1,2\}$.
 
 % ============================================================
-\section{Results and Evaluation}
+\section{Experimental Evaluation}
 \label{sec:experiments}
+
+\subsection{Purpose of evaluation}
+\label{subsec:purpose}
+The evaluation has three purposes, mirroring the research questions of \S\ref{sec:intro}:
+\textbf{(RQ1, reproduce)} establish the ERM baseline collapse and test whether invariant
+objectives recover OOD accuracy under an honest selection protocol;
+\textbf{(RQ2, break)} map the failure modes of invariant learning across penalty
+strength, backbone capacity, number of environments, spurious-feature count, sample
+size, and dataset;
+\textbf{(RQ3, diagnose)} verify with calibration, attribution, and representation
+probes whether a model has actually abandoned the spurious feature.
+Each results subsection below is tagged with the RQ it answers.
+
+\subsection{Evaluation protocol}
+\label{subsec:protocol}
+
+\paragraph{Data.}
+All experiments use the Colored-MNIST construction of \S\ref{sec:problem}. The two
+training environments are disjoint halves of the MNIST training split
+($\approx$30{,}000 images each, $p_e=0.1$ and $p_e=0.2$); the OOD test environment is
+the full 10{,}000-image MNIST test split with the correlation reversed ($p_e=0.9$).
+The small-$n$ ablation subsamples each training env to 6{,}250 images; the transfer
+check rebuilds both splits from FashionMNIST under the identical protocol.
+
+\paragraph{Metrics.}
+For the test environment with groups $g=(y,c) \in \{0,1\}^2$:
+ID-avg $= (\mathrm{Acc}_{e_1}+\mathrm{Acc}_{e_2})/2$;
+OOD accuracy $= \mathrm{Acc}_{\mathrm{te}}$;
+OOD gap $=$ ID-avg $-$ OOD;
+worst-group $= \min_g \mathrm{Acc}_g$ (a coarse equalized-odds proxy);
+ECE with 15 bins.
+
+\paragraph{Model selection.}
+Primary protocol is \textbf{train-domain validation} (checkpoint maximizing ID-avg);
+the \textbf{OOD oracle} (maximizing test accuracy) is reported as reference to quantify
+selection bias. All numbers are mean$\pm$std over 3 seeds unless stated otherwise.
 
 \subsection{Main comparison (RQ1)}
 Table~\ref{tab:main} and Fig.~\ref{fig:accbar} summarize the base sweep under honest
@@ -258,7 +284,17 @@ Table~\ref{tab:sweep} varies penalty strength at 3 seeds. IRM is nearly
 (seeds 0/2 collapse to worst-group $0.0$ at every $\lambda$; seed 1 survives):
 the penalty saturates and the outcome is decided by early-training seed luck.
 REx behaves oppositely: monotone improvement in $\beta$ with shrinking variance,
-down to $\pm0.001$ at $\beta=10^4$ --- the most stable cell in the whole program.
+down to $\pm0.001$ at $\beta=10^4$ --- the most stable cell in the whole suite.
+
+\paragraph{Takeaway.}
+The two invariance objectives fail oppositely: IRMv1's outcome is decided by
+early-training seed luck, not by tuning $\lambda$; ranking methods without
+mean$\pm$std over multiple seeds is therefore meaningless on this benchmark.
+
+\paragraph{Takeaway.}
+The two invariance objectives fail oppositely: IRMv1's outcome is decided by
+early-training seed luck, not by tuning $\lambda$; ranking methods without
+mean$\pm$std over multiple seeds is therefore meaningless on this benchmark.
 
 \begin{table}[H]
 \centering
@@ -298,6 +334,11 @@ Case & Train & Test OOD & Gap & Worst & ECE \\
 \end{tabular}
 \end{table}
 
+\paragraph{Takeaway.}
+The theoretical failure conditions bite exactly as stated: invariance objectives need
+more environments than independent spurious features, and no backbone or capacity
+setting removes IRMv1's seed fragility on this benchmark.
+
 \subsection{Diagnostics (RQ3)}
 Reliability diagrams (Fig.~\ref{fig:rel}) show ERM is confidently wrong OOD
 (ECE $0.055$) while IRM is under-confident and miscalibrated (ECE $0.231$):
@@ -323,16 +364,16 @@ is kept as baseline only given its sanity-check failures \citep{adebayo2018sanit
 \begin{figure}[H]
 \centering
 \includegraphics[width=\linewidth]{figs/ig_erm_vs_irm.png}
-\caption{Integrated Gradients (primary XAI): top row ERM, bottom row IRM. ERM attributes
-to background color; IRM concentrates on digit strokes.}
+\caption{Integrated Gradients (primary XAI): top row ERM, bottom row IRM. ERM's
+attributions concentrate on the background color; IRM concentrates on digit strokes.}
 \label{fig:ig}
 \end{figure}
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=\linewidth]{figs/saliency_erm_vs_irm.png}
-\caption{Vanilla saliency (baseline only; known sanity-check limitations
-\cite{adebayo2018sanity}). Fig.~\ref{fig:ig} is the primary evidence.}
+\caption{Vanilla saliency (baseline only; see text for its known limitations
+\citep{adebayo2018sanity}). Fig.~\ref{fig:ig} is the primary evidence.}
 \label{fig:sal}
 \end{figure}
 
@@ -342,8 +383,13 @@ classification head rather than purging it from the representation --- consisten
 the DFR observation \citep{kirichenko2022dfr} that core features are learned but
 mis-weighted in the last layer.
 
+\paragraph{Takeaway.}
+The three diagnostics agree: a model that looks ``invariant'' by accuracy can still
+carry the spurious feature intact in its representation --- conclusions must be drawn
+from probing the model, not from headline OOD accuracy alone.
+
 % ============================================================
-\section{Conclusion}
+\section{Conclusion and Lessons}
 \label{sec:conclusion}
 
 ERM achieves near-perfect ID accuracy by exploiting color and collapses OOD
