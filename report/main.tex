@@ -9,7 +9,6 @@
 \usepackage{subcaption}
 \usepackage{float}
 \usepackage{xcolor}
-\usepackage{listings}
 \hypersetup{colorlinks=true,linkcolor=blue!60!black,citecolor=blue!60!black,urlcolor=blue!60!black}
 
 \title{Spurious Correlations and Invariant Learning:\\ ERM vs IRM vs REx on Colored-MNIST}
@@ -39,7 +38,30 @@ Code: & \texttt{src/cmnist} + \texttt{scripts/} (\texttt{uv}-pinned, 3 seeds) \\
 {\small Hanoi, October 2026\par}
 \end{titlepage}
 
+\begin{abstract}
+\noindent Models that ace training by exploiting \emph{spurious correlations} collapse
+under distribution shift. On Colored-MNIST, color correlates with the label in training
+($p_e \in \{0.1, 0.2\}$) and the correlation flips at test time ($p_e = 0.9$).
+We compare plain empirical risk minimization (ERM) against two invariant objectives,
+IRMv1 and V-REx, over 3 seeds with honest train-domain validation.
+ERM latches onto color (train $0.994$ $\to$ OOD $0.315\pm0.010$).
+IRMv1 recovers OOD accuracy only when the checkpoint is selected by peeking at the test
+distribution ($0.799\pm0.030$ oracle) and collapses under honest selection
+($0.243\pm0.172$); V-REx is the stable alternative ($0.424\pm0.014$ trainval,
+$0.457\pm0.001$ at $\beta=10^4$).
+An 18-case ablation program shows IRM is insensitive to $\lambda$ but bimodal in seed,
+fails with a single environment, collapses to ERM level once a second spurious feature
+appears, and transfers to Colored-FashionMNIST. Calibration, Integrated Gradients, and a
+linear color-probe (decodability $1.00$ for both ERM and IRM) complete the diagnosis:
+IRM down-weights color in the head rather than purging it from the representation.
+
+\medskip\noindent\textbf{Keywords:} spurious correlation, invariant learning, IRM, risk
+extrapolation, OOD generalization, model selection, trustworthy AI.
+\end{abstract}
+
 \tableofcontents
+\listoffigures
+\listoftables
 \newpage
 
 % ============================================================
@@ -54,21 +76,21 @@ the animal is accurate on a biased training set and wrong elsewhere.
 
 This project studies this failure mode in a controlled setting, \textbf{Colored-MNIST}
 \citep{arjovsky2019irm}: digit shape is the stable (causal) signal while color is
-spuriously correlated with the label in training ($p_e \in \{0.1,0.2\}$) and the
-correlation flips at test time ($p_e=0.9$). Our research questions are:
+spuriously correlated with the label in training and anti-correlated at test time.
+Our research questions are:
 \begin{itemize}
-\item \textbf{RQ1 (reproduce):} does plain empirical risk minimization (ERM) latch onto
-color and collapse out-of-distribution (OOD), and do invariant objectives recover OOD accuracy?
+\item \textbf{RQ1 (reproduce):} does ERM latch onto color and collapse OOD, and do
+invariant objectives recover OOD accuracy under honest model selection?
 \item \textbf{RQ2 (break):} when does invariant learning itself fail (penalty strength,
 backbone capacity, number of environments, second spurious feature, sample size, dataset)?
-\item \textbf{RQ3 (diagnose):} which diagnostics prove that a model abandoned color:
+\item \textbf{RQ3 (diagnose):} which diagnostics show that a model abandoned color:
 calibration, attributions, or representation probes?
 \end{itemize}
 
 \textbf{Contributions.}
-(1) A full mean$\pm$std comparison (3 seeds) of ERM / IRMv1 / V-REx / GroupDRO under two
-model-selection protocols (train-domain validation vs.\ OOD oracle, \cite{domainbed2021}).
-(2) A 15-case ablation program: $\lambda$-sweep, REx-$\beta$-sweep, MLP vs.\ CNN,
+(1) A mean$\pm$std comparison (3 seeds) of ERM / IRMv1 / V-REx under two model-selection
+protocols, train-domain validation vs.\ OOD oracle \citep{domainbed2021}.
+(2) An 18-case ablation program: IRM-$\lambda$-sweep, REx-$\beta$-sweep, MLP vs.\ CNN,
 single-environment, second spurious patch, small-$n$, and Colored-FashionMNIST transfer.
 (3) Reliability / Integrated-Gradients / linear-probe diagnostics linking the Reliability
 and Explainability pillars of trustworthy AI.
@@ -87,24 +109,26 @@ $\lambda$-sensitive and propose games \citep{irmgames2020}, gradient-variance pe
 \paragraph{Risk Extrapolation (REx) and Group DRO.}
 V-REx \citep{krueger2021rex} penalizes the variance of risks across environments:
 cheaper and empirically more stable than IRMv1. Group DRO \citep{sagawa2020dro} minimizes
-the worst-environment risk and is a strong baseline on subpopulation shifts.
+the worst-environment risk; our codebase implements a GroupDRO-lite objective for
+completeness and leaves its full sweep to future work.
 
 \paragraph{When invariance fails.}
 \citet{rosenfeld2021risks} prove IRM needs more environments than spurious features
 ($E > |\Psi_s|$); a single environment provably fails. \citet{zhou2022sparseirm} show
 over-parameterization breaks IRM. \citet{domainbed2021} show model selection matters:
-IRM's advantage shrinks under train-domain validation, which we adopt as our primary protocol.
+reported advantages shrink under train-domain validation, which we adopt as primary.
 
 \paragraph{Benchmarks and last-layer findings.}
 DomainBed \citep{domainbed2021}, WILDS \citep{koh2021wilds}, and SubpopBench
 \citep{yang2023subpopbench} document benchmark disagreement: no method wins everywhere.
 \citet{kirichenko2022dfr} (DFR) and \citet{liu2021jtt} (JTT) show core features are often
 learned but mis-weighted in the head, motivating our linear color-probe. For
-explainability we use Integrated Gradients \citep{sundararajan2017ig} rather than vanilla
-saliency, which fails sanity checks \citep{adebayo2018sanity}.
+explainability we use Integrated Gradients \citep{sundararajan2017ig} as primary
+evidence; vanilla saliency fails sanity checks \citep{adebayo2018sanity} and is kept as
+baseline only.
 
 % ============================================================
-\section{Problem Statement}
+\section{Problem Formulation}
 \label{sec:problem}
 
 \paragraph{Structural causal model.}
@@ -133,15 +157,16 @@ cross-entropy $\ell$. With per-env risks $R^e$:
 \end{align}
 The dummy-classifier trick ($w=1.0$) makes the IRM penalty first-order differentiable.
 
-\paragraph{Metrics.}
-For test environment with groups $g=(y,c) \in \{0,1\}^2$:
+\paragraph{Metrics and model selection.}
+For the test environment with groups $g=(y,c) \in \{0,1\}^2$:
 ID-avg $= (\mathrm{Acc}_{e_1}+\mathrm{Acc}_{e_2})/2$;
-OOD acc $= \mathrm{Acc}_{\mathrm{te}}$;
+OOD accuracy $= \mathrm{Acc}_{\mathrm{te}}$;
 OOD gap $=$ ID-avg $-$ OOD;
 worst-group $= \min_g \mathrm{Acc}_g$ (a coarse equalized-odds proxy);
 ECE with 15 bins.
-Model selection: \textbf{train-domain validation} (checkpoint maximizing ID-avg;
-primary, honest) vs.\ \textbf{OOD oracle} (maximizing test acc; reference only).
+Primary protocol is \textbf{train-domain validation} (checkpoint maximizing ID-avg);
+the \textbf{OOD oracle} (maximizing test accuracy) is reported as reference to quantify
+selection bias. All numbers are mean$\pm$std over 3 seeds unless stated otherwise.
 
 % ============================================================
 \section{Method}
@@ -150,69 +175,63 @@ primary, honest) vs.\ \textbf{OOD oracle} (maximizing test acc; reference only).
 \paragraph{Pipeline.}
 \texttt{data}$\to$\texttt{train}$\to$\texttt{eval}$\to$\texttt{viz}:
 \texttt{src/cmnist/data.py} builds Colored-MNIST/FashionMNIST (Arjovsky protocol +
-optional $3\times3$ patch spurious); \texttt{models.py} gives MLP (2$\times$256,
-IRM-friendly) and a small CNN (deliberately over-parameterized);
-\texttt{losses.py} implements ERM/IRMv1/V-REx/GroupDRO-lite;
+optional $3\times3$ patch spurious); \texttt{models.py} gives an MLP ($2\times256$)
+and a small CNN; \texttt{losses.py} implements ERM/IRMv1/V-REx/GroupDRO-lite;
 \texttt{train.py} runs Adam ($lr=10^{-3}$, batch 2048, 2000 steps) with penalty annealing
-and tracks best-ID / best-OOD checkpoints; \texttt{eval.py} reports per-env acc,
-worst-group, gap, ECE.
+and records best-ID / best-OOD checkpoints; \texttt{eval.py} reports per-env accuracy,
+worst-group, gap, and ECE.
 
-\paragraph{Configs and budget.}
-\texttt{fast} (500 steps, 1 seed, demo) / \texttt{base} (2000 steps $\times$
-ERM/IRM/REx $\times$ 3 seeds, main) / \texttt{heavy} (base + GroupDRO +
-$\lambda$-sweep $\{10^2,10^3,10^4,3{\times}10^4\}$ + REx-$\beta$-sweep
-$\{10^2,10^3,10^4\}$ + backbones + single-env/patch/small-$n$ + FashionMNIST;
-$\approx$ 1\,h on RTX 3080). All tables are mean$\pm$std over 3 seeds under
-train-domain validation unless stated otherwise.
+\paragraph{Experiment budget.}
+\texttt{fast} (500 steps, 1 seed, pipeline demo), \texttt{base} (2000 steps $\times$
+ERM/IRM/REx $\times$ 3 seeds, main comparison), \texttt{heavy} (penalty sweeps +
+backbones + failure variants + FashionMNIST transfer, 54 runs total).
+Total compute was $\approx$ 3\,h on an RTX 3080 (10\,GB); deterministic cuDNN,
+seeds $\{0,1,2\}$. Below the annealing threshold (190 steps) every method degenerates
+to ERM.
 
 % ============================================================
-\section{Experimental Evaluation}
+\section{Results and Evaluation}
 \label{sec:experiments}
 
-\subsection{Purpose and scenarios}
-We (a) reproduce the ERM collapse and invariant recovery, (b) stress-test IRM/REx along
-six axes, (c) verify with calibration and XAI that recovered accuracy comes from shape.
-Data: Colored-MNIST ($p_e=0.1/0.2\to0.9$, label noise 0.25) plus Colored-FashionMNIST
-transfer; failure variants: single-env ($E=1$), second spurious patch
-($E \le |\Psi_s|$), small-$n$ (6250/env).
-
-\subsection{Main results (RQ1)}
-Table~\ref{tab:main} and Fig.~\ref{fig:accbar} summarize the base sweep.
+\subsection{Main comparison (RQ1)}
+Table~\ref{tab:main} and Fig.~\ref{fig:accbar} summarize the base sweep under honest
+selection. ERM fits training almost perfectly and collapses OOD; IRMv1 collapses with
+it but with an order of magnitude larger seed variance; V-REx is the only method that
+stably beats the ERM baseline OOD.
 
 \begin{table}[H]
 \centering
-\caption{Main sweep under train-domain validation (mean$\pm$std, 3 seeds, 2000 steps).
-Honest protocol: checkpoint selected by ID-avg, evaluated OOD.}
+\caption{Main sweep under train-domain validation (mean$\pm$std, 3 seeds, 2000 steps).}
 \label{tab:main}
 \begin{tabular}{lccccc}
 \toprule
 Method & Train (ID avg) & Test (OOD) & OOD gap & Worst group & ECE \\
 \midrule
-\input{../outputs/figs/summary.tex}
+\input{tables/main.tex} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.8\linewidth]{../outputs/figs/acc_bar.png}
-\caption{Train vs.\ OOD test accuracy. ERM collapses; invariant objectives recover.}
+\includegraphics[width=0.8\linewidth]{figs/acc_bar.png}
+\caption{Train vs.\ OOD test accuracy (trainval protocol, error bars = std over 3 seeds).
+ERM collapses; only V-REx stably recovers.}
 \label{fig:accbar}
 \end{figure}
 
-\paragraph{Model-selection honesty.}
-Table~\ref{tab:proto} contrasts train-domain validation (honest) with the OOD oracle
-(peeking at the test distribution, \cite{domainbed2021}).
-IRM's advantage lives entirely in the oracle column: under honest selection IRM collapses
-($0.243\pm0.172$) while V-REx is the stable winner ($0.424\pm0.014$).
+\paragraph{Model selection is the headline.}
+Table~\ref{tab:proto} contrasts honest selection with the OOD oracle
+\citep{domainbed2021}. IRM's advantage lives entirely in the oracle column
+($0.799\pm0.030$); under honest selection it scores $0.243\pm0.172$, \emph{below} ERM.
 Reporting only oracle/last checkpoints inflates IRM by $+0.55$ --- the central
-methodological lesson of this project.
+methodological finding of this project.
 
 \begin{table}[H]
 \centering
-\caption{Model-selection protocol matters (test OOD acc, mean$\pm$std, 3 seeds).
+\caption{Model-selection protocol matters (test OOD accuracy, mean$\pm$std, 3 seeds).
 \texttt{trainval} = checkpoint maximizing ID-avg (honest, primary);
-\texttt{oracle} = maximizing test acc (reference); \texttt{last} = final checkpoint.}
+\texttt{oracle} = maximizing test accuracy (reference); \texttt{last} = final checkpoint.}
 \label{tab:proto}
 \begin{tabular}{lccc}
 \toprule
@@ -225,94 +244,127 @@ V-REx ($\beta{=}10^3$) & $0.424\pm0.014$ & $0.563\pm0.045$ & $0.439\pm0.028$ \\
 \end{tabular}
 \end{table}
 
-\subsection{Ablations (RQ2)}
-Table~\ref{tab:ablate} aggregates the heavy program (train-domain validation, 3 seeds).
+\subsection{Penalty stability (RQ2a)}
+Table~\ref{tab:sweep} varies penalty strength at 3 seeds. IRM is nearly
+\emph{insensitive} to $\lambda$ within a seed yet \emph{bimodal} across seeds
+(seeds 0/2 collapse to worst-group $0.0$ at every $\lambda$; seed 1 survives):
+the penalty saturates and the outcome is decided by early-training seed luck.
+REx behaves oppositely: monotone improvement in $\beta$ with shrinking variance,
+down to $\pm0.001$ at $\beta=10^4$ --- the most stable cell in the whole program.
 
 \begin{table}[H]
 \centering
-\caption{Ablations: penalty strength, backbone, failures, transfer (mean$\pm$std).}
-\label{tab:ablate}
+\caption{Penalty sweeps under train-domain validation (mean$\pm$std, 3 seeds).}
+\label{tab:sweep}
 \begin{tabular}{lccccc}
 \toprule
 Case & Train & Test OOD & Gap & Worst & ECE \\
 \midrule
-\input{../outputs/figs/ablate_summary.tex}
+\input{tables/sweep.tex} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Expected patterns: (A1) inverted-U in $\lambda$ (too small $=$ ERM-like, too large $=$
-collapse/instability); REx-$\beta$ flatter than IRM-$\lambda$; (A2) CNN underperforms MLP
-under IRM (over-parameterization); (A3) single-env fails, second patch drags IRM toward
-ERM ($E \le |\Psi_s|$), small-$n$ widens variance; (A4) effect transfers to FashionMNIST
-at lower absolute accuracy.
+\subsection{Backbones, failures, and transfer (RQ2b)}
+Table~\ref{tab:robust} stresses IRM along five axes. A second spurious patch drags IRM
+($0.117\pm0.008$) down to ERM level ($0.146\pm0.002$), confirming the
+$E > |\Psi_s|$ condition \citep{rosenfeld2021risks} in practice; a single environment
+fails with extreme variance ($0.431\pm0.243$); small-$n$ widens variance further.
+The effect transfers to Colored-FashionMNIST (IRM $0.650\pm0.063$ vs.\ ERM
+$0.260\pm0.009$).
+The backbone effect is protocol-dependent and we report it honestly: under trainval the
+CNN averages higher OOD ($0.539\pm0.084$) than the MLP ($0.286\pm0.255$), but its
+worst-group stays near $0.10$ --- capacity changes \emph{which} seed collapses, not
+whether collapse happens.
+
+\begin{table}[H]
+\centering
+\caption{Robustness and transfer under train-domain validation (mean$\pm$std, 3 seeds).}
+\label{tab:robust}
+\begin{tabular}{lccccc}
+\toprule
+Case & Train & Test OOD & Gap & Worst & ECE \\
+\midrule
+\input{tables/robust.tex} \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Diagnostics (RQ3)}
+Reliability diagrams (Fig.~\ref{fig:rel}) show ERM is confidently wrong OOD
+(ECE $0.055$) while IRM is under-confident and miscalibrated (ECE $0.231$):
+trading ID fit for invariance costs calibration.
+Integrated Gradients (Fig.~\ref{fig:ig}, primary XAI evidence) concentrate on digit
+strokes for IRM and on background color for ERM; vanilla saliency (Fig.~\ref{fig:sal})
+is kept as baseline only given its sanity-check failures \citep{adebayo2018sanity}.
+
 \begin{figure}[H]
 \centering
 \begin{subfigure}{0.49\linewidth}
-\includegraphics[width=\linewidth]{../outputs/figs/reliability_erm.png}
-\caption{ERM (OOD).}
+\includegraphics[width=\linewidth]{figs/reliability_erm.png}
+\caption{ERM (OOD, ECE $0.055$).}
 \end{subfigure}
 \begin{subfigure}{0.49\linewidth}
-\includegraphics[width=\linewidth]{../outputs/figs/reliability_irm.png}
-\caption{IRM (OOD).}
+\includegraphics[width=\linewidth]{figs/reliability_irm.png}
+\caption{IRM (OOD, ECE $0.231$).}
 \end{subfigure}
-\caption{Reliability diagrams on OOD test. Ideal = diagonal; IRM trades ID fit for OOD calibration.}
+\caption{Reliability diagrams on the OOD test set. Diagonal = perfect calibration.}
 \label{fig:rel}
 \end{figure}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\linewidth]{../outputs/figs/ig_erm_vs_irm.png}
-\caption{Integrated Gradients (primary XAI): top ERM, bottom IRM. ERM attributes to
-background color; IRM concentrates on digit strokes.}
+\includegraphics[width=\linewidth]{figs/ig_erm_vs_irm.png}
+\caption{Integrated Gradients (primary XAI): top row ERM, bottom row IRM. ERM attributes
+to background color; IRM concentrates on digit strokes.}
 \label{fig:ig}
 \end{figure}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\linewidth]{../outputs/figs/saliency_erm_vs_irm.png}
+\includegraphics[width=\linewidth]{figs/saliency_erm_vs_irm.png}
 \caption{Vanilla saliency (baseline only; known sanity-check limitations
-\cite{adebayo2018sanity}). IG (Fig.~\ref{fig:ig}) is the primary evidence.}
+\cite{adebayo2018sanity}). Fig.~\ref{fig:ig} is the primary evidence.}
 \label{fig:sal}
 \end{figure}
 
-A linear color-probe on penultimate features (\texttt{diagnostics.json}) stays highly
-decodable for both ERM and IRM, i.e.\ IRM down-weights color in the head rather than
-purging it from the representation --- consistent with DFR \citep{kirichenko2022dfr}:
-core features are learned but mis-weighted in the last layer.
+A linear color-probe on penultimate features stays perfectly decodable (held-out
+accuracy $1.00$) for \emph{both} ERM and IRM: IRM down-weights color in the
+classification head rather than purging it from the representation --- consistent with
+the DFR observation \citep{kirichenko2022dfr} that core features are learned but
+mis-weighted in the last layer.
 
 % ============================================================
-\section{Conclusion and Lessons}
+\section{Conclusion}
 \label{sec:conclusion}
 
-ERM achieves high ID accuracy by exploiting color and collapses OOD (train $\approx 0.86$
-$\to$ test $\approx 0.14$ in smoke runs); IRMv1 recovers OOD accuracy but is
-$\lambda$- and seed-sensitive, while V-REx is the stable alternative at the same cost.
+ERM achieves near-perfect ID accuracy by exploiting color and collapses OOD
+($0.994 \to 0.315\pm0.010$); IRMv1 recovers OOD accuracy only under OOD-peeking
+selection ($0.799$) and collapses honestly ($0.243\pm0.172$), while V-REx is the stable
+alternative at the same cost ($0.457\pm0.001$ at $\beta=10^4$).
 Two environments do not suffice once a second spurious feature appears; one environment
-fails outright; over-parameterized CNNs break IRM where small MLPs succeed.
+fails outright; backbone capacity reshuffles but does not remove seed sensitivity.
 
-\textbf{Lessons:} (1) always report train-domain validation alongside the OOD oracle;
-(2) single-seed IRM numbers are not citable --- report mean$\pm$std; (3) synthetic-only
-scope limits external validity (Waterbirds/CelebA excluded by budget; see limitations);
-(4) spurious correlation is a fairness issue (worst-group $\approx$ equalized odds):
-deployment on biased data risks systematic harm to minority groups.
-
-\paragraph{Limitations.}
-Synthetic MNIST/FashionMNIST only; no real-world shift (WILDS/SubpopBench); MLP/CNN only;
-vanilla saliency retained for comparison despite sanity-check caveats.
+\textbf{Lessons:} (1) always report train-domain validation alongside the OOD oracle ---
+single-seed or oracle-only IRM numbers are not citable; (2) penalty strength matters less
+than seed luck for IRMv1, while REx scales cleanly in $\beta$; (3) synthetic-only scope
+(Waterbirds/CelebA excluded by budget) limits external validity; (4) spurious correlation
+is a fairness issue (worst-group $\approx$ equalized odds): deploying on biased data
+risks systematic harm to minority groups.
 
 \appendix
 \section{Reproducibility}
-\texttt{uv venv --python 3.12 .venv \&\& uv sync}; then
-\texttt{uv run pytest tests/ -x -q},
-\texttt{uv run python scripts/run\_sweep.py --config configs/base.yaml --out outputs/sweep},
-\texttt{uv run python scripts/ablate.py --config configs/heavy.yaml --out outputs/ablate},
-\texttt{uv run python scripts/make\_plots.py --in outputs/sweep/results.json --out outputs/figs},
-\texttt{uv run python scripts/make\_diagnostics.py --config configs/fast.yaml --out outputs/figs}.
-Deterministic cuDNN, seeds $\{0,1,2\}$, annealing threshold 190 steps (below it every method
-degenerates to ERM).
+\texttt{uv venv --python 3.12 .venv \&\& uv sync --extra dev}; then
+\texttt{.venv/bin/python -m pytest tests/ -x -q},
+\texttt{.venv/bin/python scripts/run\_sweep.py --config configs/base.yaml --out outputs/sweep},
+\texttt{.venv/bin/python scripts/ablate.py --config configs/heavy.yaml --out outputs/ablate},
+\texttt{.venv/bin/python scripts/make\_plots.py --in outputs/sweep/results.json --out outputs/figs},
+\texttt{.venv/bin/python scripts/make\_diagnostics.py --config configs/fast.yaml --out outputs/figs}.
+Raw results: \texttt{outputs/sweep/results.json} (27 rows),
+\texttt{outputs/ablate/ablate\_full.json} (54 rows).
+Report self-contained sources: \texttt{report/main.tex}, \texttt{report/references.bib},
+\texttt{report/figs/}, \texttt{report/tables/}; build with
+\texttt{pdflatex + bibtex + pdflatex$\times$2} inside \texttt{report/}.
 
 \bibliographystyle{plainnat}
 \bibliography{references}

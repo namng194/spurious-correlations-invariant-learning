@@ -25,6 +25,12 @@ def mean_std(xs):
     return float(xs.mean()), float(xs.std(ddof=1)) if len(xs) > 1 else 0.0
 
 
+def _fmt(x, nd=3):
+    if x != x:  # nan (e.g. single-env has no ID/OOD gap)
+        return "---"
+    return f"{x:.{nd}f}"
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--in", dest="inp", default="outputs/sweep/results.json")
@@ -70,14 +76,17 @@ def main():
             avg = lambda k: sum(r[k] for r in rs) / n
             sd = lambda k: mean_std([r[k] for r in rs])[1]
             lines.append(
-                f"| {m} | {avg('train_acc'):.3f} | {avg('test_acc'):.3f}±{sd('test_acc'):.3f} | "
-                f"{avg('ood_gap'):.3f} | {avg('test_worst'):.3f}±{sd('test_worst'):.3f} | "
-                f"{avg('test_ece'):.3f} |")
+                f"| {m} | {_fmt(avg('train_acc'))} | {_fmt(avg('test_acc'))}±{_fmt(sd('test_acc'))} | "
+                f"{_fmt(avg('ood_gap'))} | {_fmt(avg('test_worst'))}±{_fmt(sd('test_worst'))} | "
+                f"{_fmt(avg('test_ece'))} |")
             tex.append(
-                f"{m} & {avg('train_acc'):.3f} & {avg('test_acc'):.3f} $\\pm$ {sd('test_acc'):.3f} & "
-                f"{avg('ood_gap'):.3f} & {avg('test_worst'):.3f} $\\pm$ {sd('test_worst'):.3f} & "
-                f"{avg('test_ece'):.3f} \\\\")
+                f"{m} & {_fmt(avg('train_acc'))} & {_fmt(avg('test_acc'))} $\\pm$ {_fmt(sd('test_acc'))} & "
+                f"{_fmt(avg('ood_gap'))} & {_fmt(avg('test_worst'))} $\\pm$ {_fmt(sd('test_worst'))} & "
+                f"{_fmt(avg('test_ece'))} \\\\")
         open(os.path.join(args.out, "summary.md"), "w").write("\n".join(lines) + "\n")
+        # NOTE: last table row must NOT end with \\ (breaks booktabs rules after
+        # \input inside tabular); the main .tex adds the final \\ after \input.
+        tex[-1] = tex[-1].removesuffix(" \\\\")
         open(os.path.join(args.out, "summary.tex"), "w").write("\n".join(tex) + "\n")
         print("\n".join(lines))
     else:
@@ -94,21 +103,25 @@ def main():
         lines = ["| case | train_acc | test_acc | ood_gap | worst_group | ece |",
                  "|---|---|---|---|---|---|"]
         tex = []
+        def _case(c):
+            return c.replace("_", "\\_")
+
         for case in sorted(base):
             rs = base[case]
             n = len(rs)
             avg = lambda k: sum(r[k] for r in rs) / n
             sd = lambda k: mean_std([r[k] for r in rs])[1]
             lines.append(
-                f"| {case} | {avg('train_acc'):.3f} | {avg('test_acc'):.3f}±{sd('test_acc'):.3f} | "
-                f"{avg('ood_gap'):.3f} | {avg('test_worst'):.3f}±{sd('test_worst'):.3f} | "
-                f"{avg('test_ece'):.3f} |")
+                f"| {case} | {_fmt(avg('train_acc'))} | {_fmt(avg('test_acc'))}±{_fmt(sd('test_acc'))} | "
+                f"{_fmt(avg('ood_gap'))} | {_fmt(avg('test_worst'))}±{_fmt(sd('test_worst'))} | "
+                f"{_fmt(avg('test_ece'))} |")
             tex.append(
-                f"\\texttt{{{case}}} & {avg('train_acc'):.3f} & "
-                f"{avg('test_acc'):.3f} $\\pm$ {sd('test_acc'):.3f} & "
-                f"{avg('ood_gap'):.3f} & {avg('test_worst'):.3f} $\\pm$ {sd('test_worst'):.3f} & "
-                f"{avg('test_ece'):.3f} \\\\")
+                f"\\texttt{{{_case(case)}}} & {_fmt(avg('train_acc'))} & "
+                f"{_fmt(avg('test_acc'))} $\\pm$ {_fmt(sd('test_acc'))} & "
+                f"{_fmt(avg('ood_gap'))} & {_fmt(avg('test_worst'))} $\\pm$ {_fmt(sd('test_worst'))} & "
+                f"{_fmt(avg('test_ece'))} \\\\")
         open(os.path.join(args.out, "ablate_summary.md"), "w").write("\n".join(lines) + "\n")
+        tex[-1] = tex[-1].removesuffix(" \\\\")
         open(os.path.join(args.out, "ablate_summary.tex"), "w").write("\n".join(tex) + "\n")
         print("\n".join(lines))
 
