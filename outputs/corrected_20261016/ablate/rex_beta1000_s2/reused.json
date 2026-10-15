@@ -1,0 +1,11 @@
+{
+  "seed": 2,
+  "protocol": "trainval",
+  "checkpoint_step": 2000,
+  "train_acc": 0.8191666603088379,
+  "test_acc": 0.357699990272522,
+  "ood_gap": 0.4614666700363159,
+  "test_worst": 0.2651464343070984,
+  "test_ece": 0.3374293915092946,
+  "reused_from": "C:\\Users\\toant\\Desktop\\explanable_ai\\spurious-correlations-invariant-learning\\outputs\\corrected_20261016\\sweep\\rex_s2\\run.json"
+}

@@ -599,7 +599,7 @@ under this evaluation setting.
 \small
 \setlength{\tabcolsep}{4pt}
 \caption{Main OOD comparison under train-domain validation
-(mean$\pm$std over 3 seeds).}\label{tab:main}
+(3 seeds; OOD and worst-group accuracy are mean$\pm$sample SD; other metrics are means).}\label{tab:main}
 \begin{tabular}{lccccc}
 \toprule
 Method & Train (ID avg) & Test (OOD) & OOD gap & Worst group & ECE \\
@@ -614,7 +614,7 @@ Method & Train (ID avg) & Test (OOD) & OOD gap & Worst group & ECE \\
 \centering
 \includegraphics[width=0.8\linewidth]{figs/acc_bar.png}
 \caption{Training and OOD test accuracy under train-domain validation.
-Error bars indicate the standard deviation over three random seeds.}
+Error bars on both series indicate sample standard deviation over three training seeds. Checkpoints are selected using held-out ID validation.}
 \label{fig:accbar}
 \end{figure}
 
@@ -629,15 +629,14 @@ final checkpoint, following the distinction discussed in DomainBed
 \small
 \setlength{\tabcolsep}{4pt}
 \caption{OOD accuracy under different model-selection protocols
-(mean$\pm$std over 3 seeds).}
+(mean$\pm$sample SD over 3 seeds).}
 \label{tab:proto}
 \begin{tabular}{lccc}
 \toprule
 Method & Train-domain validation & OOD oracle & Last checkpoint \\
 \midrule
-ERM & $0.315\pm0.010$ & $0.331\pm0.024$ & $0.304\pm0.014$ \\
-IRMv1 ($\lambda=10^4$) & $0.243\pm0.172$ & $0.799\pm0.030$ & $0.754\pm0.109$ \\
-V-REx ($\beta=10^3$) & $0.424\pm0.014$ & $0.563\pm0.045$ & $0.439\pm0.028$ \\
+\input{tables/protocol.tex}
+\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -665,7 +664,7 @@ sample standard deviation ($n-1$ denominator).
 \small
 \setlength{\tabcolsep}{4pt}
 \caption{Penalty-strength sweep under train-domain validation
-(mean$\pm$std over 3 seeds).}
+(3 seeds; OOD and worst-group accuracy are mean$\pm$sample SD; other metrics are means).}
 \label{tab:sweep}
 \begin{tabular}{llccccc}
 \toprule
@@ -734,7 +733,7 @@ and the number of training environments.
 \small
 \setlength{\tabcolsep}{4pt}
 \caption[Backbone and environment ablations]{Backbone and environment ablations under train-domain validation
-(mean$\pm$std over 3 seeds).}
+(3 seeds; OOD and worst-group accuracy are mean$\pm$sample SD; other metrics are means).}
 \label{tab:backbone-env}
 \setlength{\tabcolsep}{4pt}
 \begin{tabular}{llccccc}
@@ -775,7 +774,7 @@ reduced sample size, and transfer to Colored-FashionMNIST.
 \small
 \setlength{\tabcolsep}{4pt}
 \caption[Spurious features, sample size, and dataset transfer]{Spurious-feature, sample-size, and dataset-transfer ablations under train-domain validation
-(mean$\pm$std over 3 seeds).}
+(3 seeds; OOD and worst-group accuracy are mean$\pm$sample SD; other metrics are means).}
 \label{tab:robust-transfer}
 \setlength{\tabcolsep}{4pt}
 \begin{tabular}{llccccc}
@@ -831,35 +830,34 @@ their calibration, input attributions, and learned representations.
 
 \subsubsection{Calibration}
 Figure~\ref{fig:rel} compares the reliability diagrams of ERM and IRM on the OOD test
-set. ERM obtains an ECE of $0.055$, while IRM obtains a higher ECE of $0.231$.
-This indicates that the two models differ not only in OOD accuracy but also in how
-well their predicted confidence matches the observed correctness.
+set for seed 0, using held-out-ID-selected checkpoints. ERM obtains an ECE of $0.664$,
+while IRMv1 obtains $0.376$. These are single-seed figure values; the main table reports
+ECE averaged over three seeds. Both models are miscalibrated in this OOD setting.
 
 \begin{figure}[!htbp]
 \centering
 \begin{subfigure}{0.38\linewidth}
 \includegraphics[width=\linewidth]{figs/reliability_erm.png}
-\caption{ERM (OOD, ECE $0.055$).}
+\caption{ERM (seed 0, ECE $0.664$).}
 \end{subfigure}\hspace{0.06\linewidth}
 \begin{subfigure}{0.38\linewidth}
 \includegraphics[width=\linewidth]{figs/reliability_irm.png}
-\caption{IRM (OOD, ECE $0.231$).}
+\caption{IRMv1 (seed 0, ECE $0.376$).}
 \end{subfigure}
-\caption{Reliability diagrams on the OOD test set. The diagonal represents perfect calibration.}
+\caption{Reliability diagrams on 10,000 OOD test images for seed 0, selected by held-out ID validation. The diagonal represents perfect calibration. Confidence is compared with the fraction of correct predictions in each bin.}
 \label{fig:rel}
 \end{figure}
 
 \subsubsection{Attribution analysis}
 To inspect which parts of the input contribute to the prediction, we use Integrated
-Gradients as the main attribution method. Figure~\ref{fig:ig} shows that the
-attributions of ERM are more strongly associated with the color-related regions,
-while IRM places relatively more emphasis on the digit strokes.
+Gradients for spatial attribution. Figure~\ref{fig:ig} shows the same four test images
+for ERM and IRMv1 at seed 0. Since color is carried by the digit strokes, these
+channel-summed maps alone do not distinguish shape dependence from color dependence.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.70\linewidth]{figs/ig_erm_vs_irm.png}
-\caption{Integrated Gradients for ERM (top row) and IRM (bottom row). ERM shows stronger
-attribution to color-related regions, while IRM places more emphasis on digit strokes.}
+\caption{Integrated Gradients for ERM (top row) and IRMv1 (bottom row), using seed-0 validation-selected checkpoints and a zero baseline with 32 integration steps. Maps are normalized individually and do not isolate color dependence.}
 \label{fig:ig}
 \end{figure}
 
@@ -870,9 +868,7 @@ methods are known to fail several sanity checks \citep{adebayo2018sanity}.
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.72\linewidth]{figs/saliency_erm_vs_irm.png}
-\caption{Vanilla saliency maps for ERM and IRM. These results are included as a
-secondary baseline; Integrated Gradients in Fig.~\ref{fig:ig} is used as the main
-attribution analysis.}
+\caption{Vanilla-gradient saliency for ERM and IRMv1, using the same seed-0 checkpoints and images as Fig.~\ref{fig:ig}. Each map is normalized separately; these spatial visualizations are descriptive rather than evidence of causal feature reliance.}
 \label{fig:sal}
 \end{figure}
 

@@ -3,6 +3,8 @@
 # REx hồi phục ổn định (test ~0.5-0.7), IRMv1 phương sai lớn theo seed (finding, khớp literature).
 data:
   data_dir: data
+  val_fraction: 0.2
+  split_seed: 0
   label_noise: 0.25
   seed: 0
   batch_size: 2048

@@ -1,0 +1,43 @@
+{
+  "ece": {
+    "erm": 0.6355036247730255,
+    "irm": 0.4575422124028206,
+    "rex": 0.2944864483892918
+  },
+  "seed": 1,
+  "protocol": "trainval",
+  "checkpoint_steps": {
+    "erm": 200,
+    "irm": 200,
+    "rex": 1200
+  },
+  "recoloring": {
+    "erm": {
+      "mean_probability_change": 0.6216733455657959,
+      "prediction_flip_rate": 0.9557999968528748,
+      "n": 10000
+    },
+    "irm": {
+      "mean_probability_change": 0.43134716153144836,
+      "prediction_flip_rate": 0.8349000215530396,
+      "n": 10000
+    },
+    "rex": {
+      "mean_probability_change": 0.35856419801712036,
+      "prediction_flip_rate": 0.5898000001907349,
+      "n": 10000
+    }
+  },
+  "erm": {
+    "train": 1.0,
+    "heldout": 1.0
+  },
+  "irm": {
+    "train": 1.0,
+    "heldout": 1.0
+  },
+  "rex": {
+    "train": 0.9925,
+    "heldout": 0.992
+  }
+}

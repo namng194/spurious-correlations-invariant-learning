@@ -1,0 +1,11 @@
+{
+  "seed": 1,
+  "protocol": "trainval",
+  "checkpoint_step": 200,
+  "train_acc": 0.8410833179950714,
+  "test_acc": 0.21369999647140503,
+  "ood_gap": 0.6273833215236664,
+  "test_worst": 0.008048289455473423,
+  "test_ece": 0.4575422124028206,
+  "reused_from": "C:\\Users\\toant\\Desktop\\explanable_ai\\spurious-correlations-invariant-learning\\outputs\\corrected_20261016\\sweep\\irm_s1\\run.json"
+}

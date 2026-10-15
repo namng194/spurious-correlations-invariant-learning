@@ -1,0 +1,21 @@
+{
+  "legacy": {
+    "seconds_60_steps": 2.104306400000496,
+    "steps_per_second": 28.512957998885454,
+    "gpu_allocated_mib": 44.83447265625
+  },
+  "batched_cpu": {
+    "seconds_60_steps": 0.6406569999999192,
+    "steps_per_second": 93.65385846093552,
+    "gpu_allocated_mib": 44.83447265625
+  },
+  "batched_cuda": {
+    "seconds_60_steps": 0.16439419999915117,
+    "steps_per_second": 364.9763799471624,
+    "gpu_allocated_mib": 118.94384765625
+  },
+  "exact_final_weights": {
+    "batched_cpu": true,
+    "batched_cuda": true
+  }
+}

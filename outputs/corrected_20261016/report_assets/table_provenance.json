@@ -1,0 +1,23 @@
+{
+  "sources": {
+    "sweep\\results.json": "2f51a7bf02c458f40c5814db7089b95c3b9a5715ce2ef779f8f281e3b92b6b68",
+    "ablate\\ablate.json": "66dce611504f40d55fc49f1a64bf861567e2eee250cbb5e47cbcf07ede19685b",
+    "diagnostics_summary.json": "06f0944a85ca470757c3005f21a99c1e43793f590c3abc78f13dc0af659b881d"
+  },
+  "training_seeds": [
+    0,
+    1,
+    2
+  ],
+  "selection": "held-out ID validation",
+  "standard_deviation": "sample SD (ddof=1), not standard error",
+  "core_table_uncertainty": "OOD and worst-group accuracy show mean plus/minus SD; other metrics are means",
+  "supplementary_table_uncertainty": "All diagnostic and group accuracy entries show mean plus/minus SD",
+  "group_counts": {
+    "y0c0": 489,
+    "y0c1": 4473,
+    "y1c0": 4508,
+    "y1c1": 530
+  },
+  "group_definition": "observed noisy label Y and color C; not demographic groups"
+}

@@ -37,7 +37,7 @@ def main():
     ap.add_argument("--out", default="outputs/figs")
     ap.add_argument("--ablate", action="store_true")
     args = ap.parse_args()
-    rows = json.load(open(args.inp))
+    rows = json.load(open(args.inp, encoding="utf-8"))
     os.makedirs(args.out, exist_ok=True)
 
     if not args.ablate:
@@ -83,11 +83,11 @@ def main():
                 f"{m} & {_fmt(avg('train_acc'))} & {_fmt(avg('test_acc'))} $\\pm$ {_fmt(sd('test_acc'))} & "
                 f"{_fmt(avg('ood_gap'))} & {_fmt(avg('test_worst'))} $\\pm$ {_fmt(sd('test_worst'))} & "
                 f"{_fmt(avg('test_ece'))} \\\\")
-        open(os.path.join(args.out, "summary.md"), "w").write("\n".join(lines) + "\n")
+        open(os.path.join(args.out, "summary.md"), "w", encoding="utf-8").write("\n".join(lines) + "\n")
         # NOTE: last table row must NOT end with \\ (breaks booktabs rules after
         # \input inside tabular); the main .tex adds the final \\ after \input.
         tex[-1] = tex[-1].removesuffix(" \\\\")
-        open(os.path.join(args.out, "summary.tex"), "w").write("\n".join(tex) + "\n")
+        open(os.path.join(args.out, "summary.tex"), "w", encoding="utf-8").write("\n".join(tex) + "\n")
         print("\n".join(lines))
     else:
         # Ablations: aggregate cases with _s{seed} suffix into mean±std per base case.
@@ -120,9 +120,9 @@ def main():
                 f"{_fmt(avg('test_acc'))} $\\pm$ {_fmt(sd('test_acc'))} & "
                 f"{_fmt(avg('ood_gap'))} & {_fmt(avg('test_worst'))} $\\pm$ {_fmt(sd('test_worst'))} & "
                 f"{_fmt(avg('test_ece'))} \\\\")
-        open(os.path.join(args.out, "ablate_summary.md"), "w").write("\n".join(lines) + "\n")
+        open(os.path.join(args.out, "ablate_summary.md"), "w", encoding="utf-8").write("\n".join(lines) + "\n")
         tex[-1] = tex[-1].removesuffix(" \\\\")
-        open(os.path.join(args.out, "ablate_summary.tex"), "w").write("\n".join(tex) + "\n")
+        open(os.path.join(args.out, "ablate_summary.tex"), "w", encoding="utf-8").write("\n".join(tex) + "\n")
         print("\n".join(lines))
 
 

@@ -1,4 +1,5 @@
 """Viz helpers: reliability diagram, sample grid, saliency maps."""
+
 from __future__ import annotations
 
 import matplotlib.pyplot as plt
@@ -31,7 +32,7 @@ def reliability_diagram(p, y, n_bins: int = 15, path: str | None = None):
         m = (conf > lo) & (conf <= hi) if b > 0 else (conf <= hi)
         if m.any():
             xs.append((lo + hi) / 2)
-            accs.append(pred[m].mean())
+            accs.append((pred[m] == y[m]).mean())
             confs.append(conf[m].mean())
     fig, ax = plt.subplots(figsize=(4, 4))
     ax.plot([0, 1], [0, 1], "--", label="perfect")
@@ -56,13 +57,14 @@ def saliency(model, x: torch.Tensor, device: str) -> np.ndarray:
 
 
 @torch.enable_grad()
-def integrated_gradients(model, x: torch.Tensor, device: str,
-                         baseline: torch.Tensor | None = None,
-                         steps: int = 32) -> np.ndarray:
+def integrated_gradients(
+    model, x: torch.Tensor, device: str, baseline: torch.Tensor | None = None, steps: int = 32
+) -> np.ndarray:
     """Integrated Gradients (Sundararajan et al. 2017) summed over channels.
 
-    Addresses vanilla-saliency sanity failures (Adebayo et al. 2018) by
-    integrating gradients along the straight path baseline -> x.
+    Integrates gradients along the straight path baseline -> x. Spatial maps
+    alone cannot distinguish shape dependence from color dependence and do not
+    replace attribution sanity checks.
     Returns (28,28) non-negative attribution map.
     """
     model.eval()

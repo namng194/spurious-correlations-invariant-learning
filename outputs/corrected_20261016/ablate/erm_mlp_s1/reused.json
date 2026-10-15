@@ -1,0 +1,11 @@
+{
+  "seed": 1,
+  "protocol": "trainval",
+  "checkpoint_step": 200,
+  "train_acc": 0.8523333370685577,
+  "test_acc": 0.1290999948978424,
+  "ood_gap": 0.7232333421707153,
+  "test_worst": 0.011091393418610096,
+  "test_ece": 0.6355036247730255,
+  "reused_from": "C:\\Users\\toant\\Desktop\\explanable_ai\\spurious-correlations-invariant-learning\\outputs\\corrected_20261016\\sweep\\erm_s1\\run.json"
+}
