@@ -108,7 +108,8 @@
 20261081M & Nguyễn Hoàng Nam \\
 20261077M & Ngô Ngọc Sâm \\
 20261058M & Nguyễn Hữu Tâm \\
-202610
+20261215M & Trần Văn Toàn \\
+% Incomplete member row: 202610 (student ID and name still need to be completed).
 \bottomrule
 \end{tabular}
 \vfill
@@ -127,15 +128,17 @@ time. We compare ERM, IRMv1, and V-REx under the same training and evaluation
 pipeline using multiple random seeds and train-domain validation as the primary 
 model-selection protocol. Additional experiments examine the effects of penalty 
 strength, backbone architecture, number of environments, additional spurious features, 
-sample size, and dataset choice. The results show that ERM performs well on the training 
-environments but degrades substantially under the OOD setting. IRMv1 is strongly 
-affected by model selection and also shows considerable variation across random seeds. 
-V-REx provides more stable behavior across the tested penalty settings. 
-The ablation experiments further show that invariant learning becomes more 
-difficult when the number of environments is reduced or additional spurious 
-features are introduced. Diagnostic analyses using calibration, Integrated Gradients, 
-and linear probes show that reduced reliance on color does not necessarily mean 
-that color information is removed from the learned representation. 
+sample size, and dataset choice. The results show that ERM achieves high training
+accuracy but performs poorly on the OOD test set. IRMv1 improves average OOD accuracy,
+although its results vary substantially across seeds and checkpoint-selection rules.
+V-REx has a similar mean OOD accuracy to IRMv1, with less variation across seeds in
+the main comparison. The ablation experiments show that architecture and additional
+spurious features can substantially change the results. However, reducing the number
+of environments or the sample size does not consistently reduce average OOD accuracy.
+Calibration, attribution maps, recoloring tests, and linear probes provide further
+information about model behavior. Color remains decodable from both ERM and IRMv1
+representations, while the attribution maps alone cannot establish whether either
+model relies more on shape.
 Overall, the results highlight the importance of model selection, repeated runs, 
 and diagnostic analysis when evaluating OOD generalization under spurious correlations.
 
@@ -194,14 +197,15 @@ less on color, including calibration, attribution methods, and representation pr
 
 The report includes three main parts:
 \begin{enumerate}
-\item We evaluate ERM, IRMv1, and V-REx across three random seeds and report the mean$\pm$std 
-results under two model-selection protocols: train-domain validation and OOD oracle 
-\citep{domainbed2021}.
+\item We compare ERM, IRMv1, and V-REx across three random seeds. Held-out
+train-domain validation is the primary checkpoint-selection rule. We also report
+OOD-oracle selection and the final checkpoint to examine how model selection affects
+the results \citep{domainbed2021}.
 \item We conduct 18 ablation settings covering the IRM-$\lambda$ sweep, REx-$\beta$ 
 sweep, MLP and CNN backbones, single-environment training, a second spurious patch, 
 small-$n$ settings, and transfer to Colored-FashionMNIST\@
-\item We examine model behavior using reliability analysis, Integrated Gradients, 
-and linear probes, with particular attention to the Reliability and Explainability 
+\item We examine model behavior using reliability analysis, Integrated Gradients,
+saliency maps, recoloring sensitivity, and linear probes, with particular attention to the Reliability and Explainability
 aspects of trustworthy AI\@
 \end{enumerate}
 % ============================================================
@@ -226,8 +230,8 @@ V-REx \citep{krueger2021rex} encourages similar risks across training environmen
 by penalizing the variance of environment-wise risks. This provides a simpler 
 alternative to the IRMv1 penalty. Group DRO \citep{sagawa2020dro} takes a 
 different approach by minimizing the loss of the worst-performing environment. 
-In this report, a simplified Group DRO objective is included as an additional 
-reference method.
+The implementation also includes a simplified Group DRO objective, but it is not
+included in the experimental comparisons reported here.
 
 \subsection{Limitations of invariant learning}
 Previous work also studies cases where invariant learning may not work as expected. 
@@ -360,6 +364,7 @@ gradient-based penalty:
 
 \[
 \min_\Phi
+\frac{1}{E}
 \sum_e R^e(w \circ \Phi)
 +
 \lambda
@@ -370,8 +375,9 @@ gradient-based penalty:
 \]
 
 The penalty encourages the learned representation to support a shared classifier
-across environments. In our experiments, the penalty is activated after an annealing
-period of 190 optimization steps, so $\lambda=0$ before step 190.
+across environments. The implementation uses the mean environment risk and the sum
+of the environment penalties. The penalty weight is zero before step 190 and takes
+its configured value from step 190 onward.
 
 \subsubsection{Variance Risk Extrapolation (V-REx)}
 V-REx encourages the model to achieve similar risks across training environments.
@@ -399,9 +405,8 @@ worst-environment loss:
 \]
 
 Unlike ERM, which optimizes the average risk, this objective gives more attention to
-the environment in which the model currently performs worst. In this report,
-GroupDRO-lite is included as an additional reference objective rather than a main
-method of analysis.
+the environment in which the model currently performs worst. GroupDRO-lite is
+implemented as a reference objective but is not evaluated in the reported experiments.
 
 For IRMv1, we use the standard dummy-classifier formulation with $w=1.0$ to compute
 the gradient penalty. Evaluation metrics, dataset sizes, and the model-selection
@@ -439,10 +444,9 @@ V-REx, and GroupDRO-lite. Training is handled by \texttt{train.py} using the Ada
 optimizer with a learning rate of $10^{-3}$, a batch size of 2048, and 2000
 optimization steps for the main experiments.
 
-For objectives that use a penalty term, the penalty is activated only after an
-annealing period of 190 steps. Before this threshold, the penalty weight is set to
-zero. Therefore, IRMv1 and V-REx initially behave like ERM and only begin enforcing
-their additional constraints after the annealing stage.
+IRMv1 uses a penalty weight of zero before step 190 and applies its configured
+penalty from step 190 onward. V-REx applies its variance penalty from the first
+training step. The warm-up schedule therefore applies only to IRMv1.
 
 During training, the pipeline records checkpoints according to both ID validation
 performance and OOD performance. These checkpoints are later used to compare the
@@ -455,7 +459,7 @@ accuracy, the performance gap between environments, and Expected Calibration Err
 (ECE).
 
 These metrics are intended to capture different aspects of model behavior. Accuracy
-measures predictive performance, worst-group accuracy reflects the weakest environment,
+measures predictive performance, worst-group accuracy reflects the weakest label--color subgroup,
 the environment gap indicates how much performance changes under distribution shift,
 and ECE provides information about calibration.
 
@@ -476,13 +480,16 @@ To manage the experimental workload, we use three execution modes.
     
     \item \texttt{heavy}: extended experiments including penalty sweeps, backbone
     comparisons, failure-case variants, and transfer to Colored-Fashion\-MNIST.
-    This configuration contains 54 runs in total.
+    This configuration contains 54 entries covering 18 settings across three seeds.
 \end{itemize}
 
-All main experiments use random seeds $\{0,1,2\}$. Deterministic cuDNN settings are
-enabled to reduce variation caused by non-deterministic GPU operations. The full
-experimental suite requires approximately three hours of GPU time on a Colab T4
-with 16\,GB of memory.
+All main experiments use random seeds $\{0,1,2\}$. The main comparison contains nine
+training runs. Twelve ablation entries reuse matching main-experiment runs, leaving
+42 additional training runs and 51 unique training runs overall. Deterministic cuDNN
+settings are enabled to reduce variation caused by non-deterministic GPU operations.
+The experiments were run in the \texttt{explanable-ai} mamba environment using
+Python 3.11.16 and CUDA-enabled PyTorch on an NVIDIA RTX 3060 Laptop GPU with
+6\,GB of memory.
 
 % ============================================================
 % ============================================================
@@ -510,17 +517,16 @@ Section~\ref{sec:results} presents the results according to these three research
 
 \subsubsection{Data}
 All experiments follow the Colored-MNIST construction described in
-\S\ref{sec:problem}. The original MNIST training set is divided into two disjoint
-training environments, each containing approximately 30,000 images. The first
-environment uses $p_e=0.1$, while the second uses $p_e=0.2$. The full MNIST test set,
-containing 10,000 images, is used as the OOD test environment with $p_e=0.9$, where
-the correlation between color and label is largely reversed.
+\S\ref{sec:problem}. The MNIST training set is divided into two disjoint
+training environments with approximately 30,000 images each, using $p_e=0.1$ and
+$p_e=0.2$. We reserve 20\% of each environment for ID validation, leaving
+approximately 24,000 training images and 6,000 validation images per environment.
+The split is fixed across training seeds. The 10,000 MNIST test images form the
+OOD environment with $p_e=0.9$.
 
-For the small-$n$ experiments, each training environment is reduced to 6,250 samples
-to examine the effect of limited training data. For the dataset-transfer experiments,
-the same environment-generation procedure is applied to FashionMNIST, allowing us to
-observe whether the behavior found on Colored-MNIST also appears on a different image
-dataset.
+In the small-$n$ setting, each environment contains 6,250 images before splitting,
+giving 5,000 training images and 1,250 validation images. The same construction
+and splitting procedure is applied to FashionMNIST for the dataset-transfer experiments.
 
 \subsubsection{Metrics}
 We report several performance metrics. The average ID accuracy across the two
@@ -561,23 +567,27 @@ divided into groups $g=(y,c)\in\{0,1\}^2$. We report the worst-group accuracy as
 \min_g \mathrm{Acc}_g.
 \]
 
-This metric indicates whether good average performance hides particularly poor
-performance on one label--color subgroup. Finally, model calibration is evaluated
-using Expected Calibration Error (ECE) with 15 confidence bins.
+This metric indicates whether good average performance hides poor performance on
+one label--color subgroup. These synthetic groups do not directly measure demographic
+fairness. Model calibration is evaluated using Expected Calibration Error (ECE)
+with 15 confidence bins. For each bin, we compare mean prediction confidence with
+the fraction of correct predictions, then weight the absolute difference by the
+proportion of samples in that bin.
 
 \subsubsection{Model selection}
-The primary model-selection protocol is \textbf{train-domain validation}, where the
-checkpoint with the highest ID-avg validation accuracy is selected without using
-information from the OOD test environment. This protocol is used for the main
-experimental results.
+The primary model-selection protocol is \textbf{train-domain validation}. We select
+the checkpoint with the highest average accuracy on the held-out ID validation
+environments, without using OOD test information. Training accuracy is reported
+separately and is not used for checkpoint selection.
 
-For comparison, we also report an \textbf{OOD oracle} result, where the checkpoint is
-selected directly according to OOD test accuracy. Since this protocol uses information
-from the test environment, it is not used as the primary evaluation setting; instead,
-it provides a reference for examining the effect of model-selection strategy.
+For comparison, we report an \textbf{OOD oracle}, selected using OOD test accuracy,
+and the final checkpoint. The oracle uses test information and serves only as a
+diagnostic comparison. Checkpoints are evaluated every 200 steps over 2000 training
+steps; ties retain the first checkpoint with the highest accuracy.
 
-Unless otherwise stated, all reported results are presented as mean$\pm$standard
-deviation over three random seeds.
+Experiments use three training seeds. OOD and worst-group accuracies are reported
+as mean$\pm$sample standard deviation; training accuracy, gap, and ECE are reported
+as means in the tables. Diagnostic figures show seed 0 unless otherwise stated.
 
 % ============================================================
 % PART 5 — RESULTS AND DISCUSSION
@@ -588,11 +598,12 @@ deviation over three random seeds.
 \subsection{Main comparison (RQ1)}
 
 Table~\ref{tab:main} and Fig.~\ref{fig:accbar} summarize the main comparison under
-the train-domain validation protocol. ERM achieves very high accuracy on the training
-environments but shows a substantial decrease in OOD accuracy. IRMv1 shows a similar
-drop, together with noticeably larger variation across random seeds. In contrast,
-V-REx achieves higher average OOD accuracy and lower seed variance than ERM and IRMv1
-under this evaluation setting.
+train-domain validation. ERM achieves a training accuracy of $0.851$ but only
+$0.119\pm0.010$ OOD accuracy. IRMv1 and V-REx obtain higher OOD accuracies of
+$0.331\pm0.152$ and $0.340\pm0.038$, respectively. Their mean results are close,
+although IRMv1 varies more across seeds. V-REx also achieves a higher worst-group
+accuracy, at $0.236\pm0.045$, compared with $0.074\pm0.058$ for IRMv1.
+None of the three methods achieves high OOD accuracy under train-domain selection.
 
 \begin{table}[!htbp]
 \centering
@@ -614,7 +625,7 @@ Method & Train (ID avg) & Test (OOD) & OOD gap & Worst group & ECE \\
 \centering
 \includegraphics[width=0.8\linewidth]{figs/acc_bar.png}
 \caption{Training and OOD test accuracy under train-domain validation.
-Error bars on both series indicate sample standard deviation over three training seeds. Checkpoints are selected using held-out ID validation.}
+Error bars on the OOD series show sample standard deviation over three training seeds. Checkpoints are selected using held-out ID validation.}
 \label{fig:accbar}
 \end{figure}
 
@@ -641,23 +652,22 @@ Method & Train-domain validation & OOD oracle & Last checkpoint \\
 \end{tabular}
 \end{table}
 
-ERM shows relatively similar OOD accuracy across the three protocols, while V-REx
-shows a moderate improvement under OOD-oracle selection. IRMv1 is much more sensitive
-to the selection strategy: its mean OOD accuracy increases from
-$0.243\pm0.172$ under train-domain validation to $0.799\pm0.030$ under OOD-oracle
-selection. The final checkpoint also reaches $0.754\pm0.109$.
+All three methods obtain higher OOD accuracy under oracle selection. ERM increases
+from $0.119\pm0.010$ to $0.338\pm0.020$, while V-REx increases from
+$0.340\pm0.038$ to $0.572\pm0.028$. The largest difference occurs for IRMv1,
+which increases from $0.331\pm0.152$ to $0.759\pm0.075$. Its final checkpoint
+obtains $0.650\pm0.108$.
 
-These results indicate that IRMv1 can reach checkpoints with high OOD accuracy during
-training, but such checkpoints are not consistently selected using only train-domain
-validation. Therefore, the OOD-oracle result is used only as a reference and should
-not be interpreted as a practical model-selection protocol.
+IRMv1 therefore reaches checkpoints with substantially better OOD performance than
+those selected by ID validation. However, selecting these checkpoints using OOD test
+accuracy requires information unavailable under the primary evaluation protocol.
 
 \FloatBarrier
 \subsection{Penalty stability (RQ2a)}
 
 Table~\ref{tab:sweep} summarizes the penalty-strength sweep over three random
-seeds. For each method and penalty strength, it reports the arithmetic mean and
-sample standard deviation ($n-1$ denominator).
+seeds. OOD and worst-group accuracies are reported as arithmetic mean and sample
+standard deviation ($n-1$ denominator); the other metrics are means.
 
 \begin{table}[!htbp]
 \centering
@@ -697,28 +707,23 @@ Method & Penalty & \shortstack{Seed 0\\OOD / Worst} & \shortstack{Seed 1\\OOD / 
 \end{tabular}
 \end{table}
 
-For IRMv1, OOD accuracy changes relatively little within each seed when
-$\lambda$ increases from $10^3$ to $3\times10^4$, whereas differences between
-seeds are large. Over this range, seed 0 achieves OOD accuracy of approximately
-$0.108$--$0.110$, seed 1 achieves $0.564$--$0.579$, and seed 2 achieves
-$0.168$--$0.171$. Seed 0 has zero worst-group accuracy at all three of these
-penalty strengths; seed 2 has low but nonzero worst-group accuracy
-($0.042$--$0.045$). The $\lambda=10^2$ setting behaves differently, with
-OOD accuracies of $0.437$, $0.394$, and $0.265$ for seeds 0, 1, and 2,
-respectively. Thus, the limited sensitivity to penalty strength applies mainly
-to the higher-penalty range, rather than to the entire sweep. These results
-establish substantial variation between runs, but do not isolate initialization
-or early training dynamics as its cause.
+For IRMv1, increasing $\lambda$ from $10^3$ to $3\times10^4$ changes OOD accuracy
+relatively little within each seed. Over this range, seed 0 obtains approximately
+$0.276$--$0.282$, seed 1 obtains $0.212$--$0.219$, and seed 2 obtains
+$0.502$--$0.509$. Differences between seeds are therefore larger than the differences
+between these penalty strengths.
 
-For V-REx, mean OOD accuracy increases from $0.293$ at $\beta=10^2$ to
-$0.437$ at $\beta=10^3$ and $0.457$ at $\beta=10^4$. OOD standard deviation
-does not decrease monotonically: it is $0.032$, $0.033$, and approximately
-$0.001$, respectively. At $\beta=10^4$, the individual OOD accuracies are
-$0.4574$, $0.4570$, and $0.4555$, showing close agreement across the tested
-seeds. Worst-group accuracy remains more variable ($0.388\pm0.021$).
-The highest tested V-REx penalty therefore gives more consistent OOD accuracy,
-although consistency alone does not imply high predictive performance. Together,
-these results support reporting both aggregate and individual-seed results.
+The $\lambda=10^2$ setting gives a mean OOD accuracy of $0.284\pm0.067$.
+Higher penalties increase the mean slightly but also show greater variation across
+seeds. The sweep does not show a consistent improvement from increasing the IRMv1
+penalty.
+
+For V-REx, mean OOD accuracy increases from $0.221\pm0.020$ at $\beta=10^2$ to
+$0.340\pm0.038$ at $\beta=10^3$ and $0.417\pm0.045$ at $\beta=10^4$.
+Worst-group accuracy also increases, reaching $0.297\pm0.099$ at the highest tested
+penalty. A stronger V-REx penalty improves average performance in this sweep, but
+it does not reduce variation across seeds. The highest penalty gives the best mean
+OOD accuracy among the tested V-REx settings.
 
 \FloatBarrier
 \subsection{Backbones, failure cases, and transfer (RQ2b)}
@@ -747,27 +752,26 @@ Method & Configuration & Train & Test OOD & Gap & Worst & ECE \\
 \end{table}
 
 \subsubsection{Backbone architecture}
-Table~\ref{tab:backbone-env} compares the MLP used in the main experiments with a small CNN. Under
-train-domain validation, the CNN achieves an OOD accuracy of
-$0.539\pm0.084$, compared with $0.286\pm0.255$ for the MLP. The CNN therefore shows
-both a higher mean OOD accuracy and lower variation in this experiment.
-
-However, its worst-group accuracy remains relatively low, indicating that improved
-average OOD accuracy does not necessarily correspond to uniformly good performance
-across all label--color groups. The backbone architecture therefore affects the
-observed performance, but does not by itself remove the difficulties caused by the
-spurious correlation.
+With IRMv1, the CNN obtains an OOD accuracy of $0.599\pm0.009$, compared with
+$0.331\pm0.152$ for the MLP (Table~\ref{tab:backbone-env}). Worst-group accuracy
+also increases, from $0.074\pm0.058$ to $0.385\pm0.072$. The CNN therefore
+performs better on both measures and shows less variation in OOD accuracy.
+These results show that the backbone affects the outcome of IRMv1 in this setting;
+they do not support the claim that the tested CNN causes invariant learning to fail.
 
 \subsubsection{Single training environment}
-Table~\ref{tab:backbone-env} also reports IRMv1 with only one training environment. The resulting
-OOD accuracy is $0.431\pm0.243$, with a large standard deviation across the three
-random seeds. Although the mean accuracy is not uniformly low, the large variation
-indicates that the result is considerably less stable when the model cannot compare
-patterns across multiple environments. This setting removes an important source of
-information used by invariant learning: variation between environments.
+IRMv1 trained with one environment obtains $0.529\pm0.233$ OOD accuracy, compared
+with $0.331\pm0.152$ with two environments. The single-environment result has a
+higher mean but also greater variation across seeds. It therefore does not show that
+using one environment necessarily reduces average OOD accuracy.
 
-Table~\ref{tab:robust-transfer} examines additional spurious features,
-reduced sample size, and transfer to Colored-FashionMNIST.
+This comparison also changes the total amount of training data: the single-environment
+setting uses approximately 24,000 training images, compared with 48,000 across two
+environments. The experiment does not isolate the effect of environment count from
+sample size.
+
+Table~\ref{tab:robust-transfer} examines additional spurious features, reduced sample
+size, and transfer to Colored-FashionMNIST.
 
 \begin{table}[!htbp]
 \centering
@@ -789,50 +793,50 @@ Method & Configuration & Train & Test OOD & Gap & Worst & ECE \\
 
 \subsubsection{Additional spurious feature}
 We introduce a second spurious feature in the form of a $3\times3$ patch
-(Table~\ref{tab:robust-transfer}).
-Under this setting, the OOD accuracy of IRMv1 decreases to
-$0.117\pm0.008$, which is close to the ERM result of $0.146\pm0.002$.
-This result is consistent with the theoretical analysis of
-\citet{rosenfeld2021risks}, which relates the ability to identify invariant features
-to the number of environments relative to the number of independent spurious
-features. In this experiment, adding another spurious signal makes the invariant
-learning problem more difficult without adding another training environment.
+(Table~\ref{tab:robust-transfer}). Adding the patch reduces IRMv1 OOD accuracy to
+$0.114\pm0.002$. ERM obtains $0.138\pm0.002$ in the same setting. Both methods
+perform poorly despite high training accuracy.
+
+The additional spurious feature makes the tested setting more difficult for IRMv1.
+This experiment is relevant to the limitations discussed by
+\citet{rosenfeld2021risks}, although it does not directly verify their theoretical
+conditions.
 
 \subsubsection{Limited training data}
-The small-$n$ setting in Table~\ref{tab:robust-transfer} reduces each training
-environment to 6,250 samples. Compared
-with the standard setting, the results show greater variation across random seeds.
-This suggests that reducing the amount of training data can make the learned solution
-less stable. Since both the stable digit-shape signal and the spurious color signal
-must be estimated from fewer observations, differences caused by initialization and
-optimization may have a larger effect on the final model.
+With 6,250 images per environment before splitting, IRMv1 obtains
+$0.333\pm0.102$ OOD accuracy, close to $0.331\pm0.152$ in the standard setting.
+Its OOD standard deviation decreases, while mean worst-group accuracy falls from
+$0.074$ to $0.051$.
+
+ERM OOD accuracy increases from $0.119\pm0.010$ to $0.255\pm0.027$.
+Reducing the sample size therefore does not produce a uniform decline in performance
+or stability across the tested methods.
 
 \subsubsection{Transfer to Colored-FashionMNIST}
-Finally, we repeat the same environment-generation procedure using FashionMNIST
-instead of MNIST. Under this setting, IRMv1 achieves an OOD accuracy of
-$0.650\pm0.063$, while ERM obtains $0.260\pm0.009$. This shows that the difference
-between ERM and IRMv1 observed in Colored-MNIST is not limited to the original MNIST
-digits under the tested transfer setting.
+On Colored-FashionMNIST, IRMv1 obtains $0.394\pm0.266$ OOD accuracy, compared
+with $0.103\pm0.001$ for ERM. IRMv1 has a higher mean, but its large standard
+deviation shows considerable variation across the three seeds.
 
-Overall, these experiments show that the behavior of invariant learning depends on
-several properties of the experimental setting. Additional spurious features, fewer
-environments, and reduced training data can make the problem less stable, while the
-choice of backbone can substantially change the observed OOD accuracy. The
-Colored-FashionMNIST experiment further provides a second dataset on which the same
-evaluation procedure can be examined.
+Overall, the ablations show that the observed results depend on architecture,
+penalty strength, and the available signals. The additional patch substantially
+reduces IRMv1 performance, while the CNN improves it. Fewer environments and fewer
+samples do not consistently reduce average OOD accuracy in these experiments.
 
 \FloatBarrier
 \subsection{Diagnostics (RQ3)}
 
 The previous experiments evaluate the models mainly through predictive performance.
 To better understand how the models use the available information, we also examine
-their calibration, input attributions, and learned representations.
+their calibration, input attributions, recoloring sensitivity, and learned representations.
 
 \subsubsection{Calibration}
-Figure~\ref{fig:rel} compares the reliability diagrams of ERM and IRM on the OOD test
-set for seed 0, using held-out-ID-selected checkpoints. ERM obtains an ECE of $0.664$,
-while IRMv1 obtains $0.376$. These are single-seed figure values; the main table reports
-ECE averaged over three seeds. Both models are miscalibrated in this OOD setting.
+Across three seeds, mean OOD ECE is $0.652$ for ERM, $0.411$ for IRMv1, and
+$0.340$ for V-REx. The invariant objectives therefore reduce ECE relative to ERM,
+although calibration errors remain substantial.
+
+Figure~\ref{fig:rel} shows seed 0, where ERM and IRMv1 obtain ECE values of
+$0.664$ and $0.376$. These values describe the plotted checkpoints and differ from
+the three-seed averages in the main table.
 
 \begin{figure}[!htbp]
 \centering
@@ -849,15 +853,16 @@ ECE averaged over three seeds. Both models are miscalibrated in this OOD setting
 \end{figure}
 
 \subsubsection{Attribution analysis}
-To inspect which parts of the input contribute to the prediction, we use Integrated
-Gradients for spatial attribution. Figure~\ref{fig:ig} shows the same four test images
-for ERM and IRMv1 at seed 0. Since color is carried by the digit strokes, these
-channel-summed maps alone do not distinguish shape dependence from color dependence.
+Integrated Gradients highlights spatial contributions to the predictions for the
+same four test images (Fig.~\ref{fig:ig}). Since color is carried by the digit
+strokes, the channel-summed maps cannot separate dependence on shape from dependence
+on color. The maps are normalized separately, so their intensities should not be
+compared as absolute attribution magnitudes.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.70\linewidth]{figs/ig_erm_vs_irm.png}
-\caption{Integrated Gradients for ERM (top row) and IRMv1 (bottom row), using seed-0 validation-selected checkpoints and a zero baseline with 32 integration steps. Maps are normalized individually and do not isolate color dependence.}
+\caption{Integrated Gradients for ERM (top row) and IRMv1 (bottom row), using seed-0 held-out-ID-selected checkpoints and a zero baseline with 32 integration steps. Each channel-summed map is scaled separately and overlaid on its input image; the maps do not separate shape dependence from color dependence.}
 \label{fig:ig}
 \end{figure}
 
@@ -868,23 +873,23 @@ methods are known to fail several sanity checks \citep{adebayo2018sanity}.
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.72\linewidth]{figs/saliency_erm_vs_irm.png}
-\caption{Vanilla-gradient saliency for ERM and IRMv1, using the same seed-0 checkpoints and images as Fig.~\ref{fig:ig}. Each map is normalized separately; these spatial visualizations are descriptive rather than evidence of causal feature reliance.}
+\caption{Vanilla-gradient saliency for ERM (top row) and IRMv1 (bottom row), using the same seed-0 checkpoints and images as Fig.~\ref{fig:ig}. Each map is scaled separately and overlaid on its input image. The maps show spatial sensitivity and do not separate shape dependence from color dependence.}
 \label{fig:sal}
 \end{figure}
 
-\subsubsection{Representation probe}
-Finally, we train a linear probe on the penultimate-layer representations to predict
-the color variable. The probe reaches a held-out accuracy of $1.00$ for both ERM and
-IRM, showing that color information remains fully decodable from the learned
-representations in both cases.
+\subsubsection{Recoloring sensitivity}
+To examine sensitivity to color more directly, we swap the red and green channels
+while preserving the digit shape. The mean prediction-flip rate is
+$0.972\pm0.016$ for ERM, $0.598\pm0.321$ for IRMv1, and $0.630\pm0.058$
+for V-REx. IRMv1 and V-REx change their predictions less often on average, but both
+remain sensitive to recoloring.
 
-This result is important when interpreting the attribution results. Although IRM
-appears to rely less on color for its final prediction, the color information has not
-been removed from the representation itself. Instead, the difference may occur in how
-the final classification layer uses the available features. This observation is
-consistent with previous findings that useful and spurious information can remain in
-the learned representation while being weighted differently by the final classifier
-\citep{kirichenko2022dfr}.
+\subsubsection{Representation probe}
+A linear color probe achieves held-out accuracy of $1.00$ for both ERM and IRMv1
+across the three seeds. Color therefore remains decodable from both representations.
+Together with the recoloring results, this shows that retaining color information
+and responding to color changes are different properties. These diagnostics do not
+establish which mechanism in the final classification layer produces the difference.
 
 % ============================================================
 % ============================================================
@@ -894,44 +899,30 @@ the learned representation while being weighted differently by the final classif
 \section{Conclusion}
 \label{sec:conclusion}
 
-This report examined how spurious correlations affect out-of-distribution
-(OOD) generalization on Colored-MNIST. ERM, IRMv1, and V-REx were compared
-using a common pipeline, three random seeds, and complementary diagnostics.
+This report compared ERM, IRMv1, and V-REx on Colored-MNIST using three random
+seeds and a common evaluation pipeline.
 
-For \textbf{RQ1}, high training accuracy did not translate into reliable OOD
-performance. ERM achieved an OOD accuracy of $0.315\pm0.010$. IRMv1 was
-particularly sensitive to checkpoint selection: its accuracy increased from
-$0.243\pm0.172$ under train-domain selection to $0.799\pm0.030$ under
-OOD-oracle selection. This difference shows that reaching a useful checkpoint
-and selecting it without OOD information are separate challenges. The oracle
-result is therefore a diagnostic reference rather than a practical selection rule.
+For \textbf{RQ1}, ERM achieved high training accuracy but only $0.119\pm0.010$
+OOD accuracy. IRMv1 and V-REx improved the mean OOD result, although their performance
+remained limited under train-domain selection. IRMv1 was particularly sensitive to
+checkpoint selection, increasing from $0.331\pm0.152$ under ID validation to
+$0.759\pm0.075$ under OOD-oracle selection.
 
-For \textbf{RQ2}, increasing the IRMv1 penalty did not consistently improve
-performance. Results varied substantially between seeds, while changing
-$\lambda$ within the higher-penalty range had relatively little effect within
-each seed. V-REx attained its most consistent OOD result at $\beta=10^4$
-($0.457\pm0.001$), although low variance alone does not imply high accuracy.
-Backbone architecture, the number of environments, an additional spurious
-patch, and sample size also affected performance. Colored-FashionMNIST
-provided a second dataset for testing the same evaluation procedure.
+For \textbf{RQ2}, larger IRMv1 penalties did not consistently improve performance.
+V-REx obtained its highest mean OOD accuracy at $\beta=10^4$, but this setting did
+not have the lowest variation. The CNN improved IRMv1 performance, while an additional
+spurious patch reduced it substantially. The single-environment and small-sample
+experiments did not show a consistent decrease in average OOD accuracy.
 
-For \textbf{RQ3}, attribution and probe analyses distinguished the information
-encoded in a representation from the information used for prediction.
-Integrated Gradients suggested greater attention to digit shape for IRM than
-for ERM, yet a linear color probe achieved held-out accuracy of $1.00$ for
-both models. Reduced apparent reliance on color therefore did not imply that
-color information had been removed from the representation.
+For \textbf{RQ3}, calibration, recoloring tests, and representation probes provided
+complementary information. Color remained decodable from both ERM and IRMv1
+representations. The attribution maps showed spatial contributions but could not
+establish a preference for shape over color.
 
-These findings support reporting checkpoint-selection rules, individual-seed
-results, and diagnostics alongside average OOD accuracy. Penalty strength
-should be assessed together with architecture and training conditions rather
-than treated as a sufficient guarantee of invariance.
-
-The conclusions are limited to the tested synthetic shifts in MNIST and
-FashionMNIST. Real-world datasets such as Waterbirds or CelebA, larger models,
-and broader hyperparameter searches remain directions for future work.
-The present results characterize the evaluated settings and do not establish
-a general ranking of OOD learning methods.
+These conclusions are limited to the tested synthetic shifts, configurations, and
+three training seeds. They do not establish a general ranking of invariant learning
+methods. Real-world datasets such as Waterbirds or CelebA, larger models, and broader
+hyperparameter searches remain directions for future work.
 
 \clearpage
 % REFERENCES: add or update entries in references.bib.
@@ -959,64 +950,69 @@ available at:
 \end{center}
 
 \subsection{Environment setup}
-The experiments were run with Python 3.12. The environment can be created using:
+The experiments were run in the \texttt{explanable-ai} mamba environment with
+Python 3.11.16 and PyTorch 2.14.1+cu130. CUDA was enabled on an NVIDIA RTX 3060
+Laptop GPU with 6\,GB of memory. The following commands use Windows CMD and assume
+that the project dependencies are installed in this environment:
 
 \begin{verbatim}
-uv venv --python 3.12 .venv
-uv sync --extra dev
-\end{verbatim}
-
-The test suite can be executed with:
-
-\begin{verbatim}
-.venv/bin/python -m pytest tests/ -x -q
+mamba activate explanable-ai
+python -m pytest tests/ -x -q
+set RESULTS=outputs/corrected_20261016
 \end{verbatim}
 
 \subsection{Main experiments}
-The main experiments can be reproduced with:
+The main and ablation experiments use the base and heavy configurations,
+respectively. Matching main runs are reused in the ablation study:
 
 \begin{verbatim}
-.venv/bin/python scripts/run_sweep.py \
-  --config configs/base.yaml \
-  --out outputs/sweep
-\end{verbatim}
-
-The extended ablation experiments can be reproduced with:
-
-\begin{verbatim}
-.venv/bin/python scripts/ablate.py \
-  --config configs/heavy.yaml \
-  --out outputs/ablate
+python scripts/run_sweep.py ^
+  --config configs/base.yaml ^
+  --out %RESULTS%/sweep --resume
+python scripts/ablate.py ^
+  --config configs/heavy.yaml ^
+  --out %RESULTS%/ablate --resume ^
+  --reuse-sweep %RESULTS%/sweep
 \end{verbatim}
 
 \subsection{Figures and diagnostics}
-The main plots are generated with:
+The report uses the existing figures in
+\path{outputs/corrected_20261016/figs/}, copied into \path{report/figs/}.
+The following commands describe how they were generated; they need not be rerun
+when only the report text is changed:
 
 \begin{verbatim}
-.venv/bin/python scripts/make_plots.py \
-  --in outputs/sweep/results.json \
-  --out outputs/figs
+python scripts/make_plots.py ^
+  --in %RESULTS%/sweep/results.json ^
+  --out %RESULTS%/figs
+python scripts/make_diagnostics.py ^
+  --config configs/base.yaml --seed 0 ^
+  --checkpoint-root %RESULTS%/sweep ^
+  --out %RESULTS%/figs
 \end{verbatim}
 
-Diagnostic figures are generated with:
-
-\begin{verbatim}
-.venv/bin/python scripts/make_diagnostics.py \
-  --config configs/fast.yaml \
-  --out outputs/figs
-\end{verbatim}
+Diagnostics reuse the held-out-ID-selected checkpoints rather than training separate
+models. The same diagnostic command is run with \texttt{--seed 1} and
+\texttt{--seed 2}, writing to \path{diagnostics/seed1/} and
+\path{diagnostics/seed2/} under the results directory. These three diagnostic outputs
+provide the averages reported in the text; the included figures use seed 0.
 
 \Needspace{6\baselineskip}
 \subsection{Saved results}
-The raw experimental results are stored in:
+The main result files are stored under
+\path{outputs/corrected_20261016/}:
 
 \begin{itemize}
-    \item \texttt{outputs/sweep/results.json}
-    \item \texttt{outputs/ablate/ablate\_full.json}
+    \item \path{sweep/results.json}: main results for all checkpoint-selection rules;
+    \item \path{ablate/ablate.json}: the 54 ablation entries;
+    \item \path{figs/diagnostics.json}: seed-0 diagnostics;
+    \item \path{diagnostics/seed1/diagnostics.json} and
+          \path{diagnostics/seed2/diagnostics.json}: the remaining seeds;
+    \item \path{diagnostics_summary.json}: three-seed ECE and recoloring summaries.
 \end{itemize}
 
-These files contain the values used to generate the tables and figures reported in
-Section~\ref{sec:results}.
-
+Individual training directories also contain configuration, split indices, training
+history, selected steps, and saved checkpoints. These artifacts provide the values
+used in Section~\ref{sec:results}.
 
 \end{document}
