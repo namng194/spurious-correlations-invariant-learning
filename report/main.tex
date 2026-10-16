@@ -482,13 +482,10 @@ To manage the experimental workload, we use three execution modes.
     This configuration contains 54 entries covering 18 settings across three seeds.
 \end{itemize}
 
-All main experiments use random seeds $\{0,1,2\}$. The main comparison contains nine
-training runs. Twelve ablation entries reuse matching main-experiment runs, leaving
-42 additional training runs and 51 unique training runs overall. Deterministic cuDNN
-settings are enabled to reduce variation caused by non-deterministic GPU operations.
-The experiments were run in the \texttt{explanable-ai} mamba environment using
-Python 3.11.16 and CUDA-enabled PyTorch on an NVIDIA RTX 3060 Laptop GPU with
-6\,GB of memory.
+All main experiments use random seeds $\{0,1,2\}$, with deterministic cuDNN
+settings enabled to reduce run-to-run variation. The full suite of 51 unique training
+runs requires approximately three hours of compute on a standard Google Colab T4 GPU
+with 16\,GB of memory.
 
 % ============================================================
 % ============================================================
