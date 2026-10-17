@@ -10,6 +10,7 @@ Protocol:
 
 Envs default: train e1 p=0.1, e2 p=0.2, test p=0.9.
 """
+
 from __future__ import annotations
 
 import os
@@ -50,7 +51,7 @@ def colorize(imgs: np.ndarray, z: np.ndarray) -> np.ndarray:
     """imgs: (N,28,28) float32 in [0,1]; z: (N,) binary color id. -> (N,3,28,28)."""
     n = imgs.shape[0]
     out = np.zeros((n, 3, 28, 28), dtype=np.float32)
-    red = (z == 0)
+    red = z == 0
     green = ~red
     out[red, 0] = imgs[red]
     out[green, 1] = imgs[green]
@@ -114,8 +115,14 @@ def build_colored_mnist(
     # halves give more samples per env with same correlation structure)
     perm = rng.permutation(len(train_imgs))
     half = len(train_imgs) // 2
-    pools = {"train": (train_imgs[perm[:half]], train_digits[perm[:half]],
-                        train_imgs[perm[half:]], train_digits[perm[half:]])}
+    pools = {
+        "train": (
+            train_imgs[perm[:half]],
+            train_digits[perm[:half]],
+            train_imgs[perm[half:]],
+            train_digits[perm[half:]],
+        )
+    }
     envs: dict[str, dict] = {}
     train_pool_idx = 0
     for spec in env_specs:
@@ -128,16 +135,95 @@ def build_colored_mnist(
     return envs
 
 
-def to_loader(env: dict, batch_size: int = 2048, shuffle: bool = True) -> DataLoader:
-    ds = TensorDataset(env["x"], env["y"], env["color"])
-    return DataLoader(ds, batch_size=batch_size, shuffle=shuffle)
+class BatchTensorDataset(TensorDataset):
+    """Fetch whole batches instead of thousands of Python sample lookups."""
+
+    def __getitems__(self, indices):
+        index = torch.as_tensor(indices, device=self.tensors[0].device)
+        return tuple(t.index_select(0, index) for t in self.tensors)
+
+
+def _already_batched(batch):
+    return batch
+
+
+def to_loader(
+    env: dict, batch_size: int = 2048, shuffle: bool = True, storage_device: str = "cpu"
+) -> DataLoader:
+    ds = BatchTensorDataset(*(env[k].to(storage_device) for k in ("x", "y", "color")))
+    return DataLoader(
+        ds,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        generator=torch.Generator().manual_seed(0),
+        collate_fn=_already_batched,
+    )
 
 
 def save_envs(envs: dict, out_dir: str):
     os.makedirs(out_dir, exist_ok=True)
     for name, env in envs.items():
         torch.save(
-            {"x": env["x"], "y": env["y"], "color": env["color"],
-             "digit": env["digit"], "p_e": env["p_e"]},
+            {
+                "x": env["x"],
+                "y": env["y"],
+                "color": env["color"],
+                "digit": env["digit"],
+                "p_e": env["p_e"],
+            },
             os.path.join(out_dir, f"{name}.pt"),
         )
+
+
+def split_environments(envs: dict, val_fraction: float = 0.2, split_seed: int = 0):
+    """Split training environments once; retain indices for auditing and replay.
+
+    The test environment is never split or used to construct validation sets.
+    Tensor metadata (including patch membership) follows the same partition.
+    """
+    if not 0 < val_fraction < 1:
+        raise ValueError("val_fraction must be between zero and one")
+    result = {}
+    generator = torch.Generator().manual_seed(split_seed)
+    for name, env in sorted(envs.items()):
+        if not name.startswith("train_"):
+            result[name] = env
+            continue
+        n = len(env["y"])
+        if n < 2:
+            raise ValueError("each training environment needs at least two examples")
+        order = torch.randperm(n, generator=generator)
+        n_val = min(n - 1, max(1, round(n * val_fraction)))
+        for key, indices in (
+            (name, order[n_val:]),
+            (name.replace("train_", "val_", 1), order[:n_val]),
+        ):
+            part = {
+                k: v[indices] if torch.is_tensor(v) and v.ndim and len(v) == n else v
+                for k, v in env.items()
+            }
+            part.update(name=key, source_indices=indices)
+            result[key] = part
+    return result
+
+
+def experiment_loaders(envs: dict, batch_size: int, seed: int = 0, storage_device: str = "cpu"):
+    """Independent training RNGs keep evaluation frequency out of batch sampling."""
+    evaluation = {
+        k: to_loader(v, batch_size, shuffle=False, storage_device=storage_device)
+        for k, v in envs.items()
+    }
+    training = []
+    for i, name in enumerate(sorted(k for k in envs if k.startswith("train_"))):
+        ds = evaluation[name].dataset
+        training.append(
+            DataLoader(
+                ds,
+                batch_size=batch_size,
+                shuffle=True,
+                generator=torch.Generator().manual_seed(seed + i),
+                collate_fn=_already_batched,
+            )
+        )
+    validation = {k: v for k, v in evaluation.items() if k.startswith("val_") or k == "test"}
+    return training, validation, evaluation

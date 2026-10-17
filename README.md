@@ -1,5 +1,18 @@
 # Spurious Correlations & Invariant Learning
 
+> **Corrected evaluation code:** existing tables and figures below are historical and
+> must be regenerated. Training environments now reserve 20% for held-out ID validation
+> (`data.val_fraction`, `data.split_seed`). Model initialization and batch sampling use
+> the run seed. ECE and reliability plots compare correctness with confidence.
+> IRMv1 alone uses penalty warm-up; V-REx applies its variance penalty from step one.
+> Every run saves `run.json` (configuration, exact split indices, history, group counts,
+> metrics and selected steps), plus `last.pt`, `trainval.pt` and `oracle.pt` checkpoints.
+> OOD oracle selection is a diagnostic reference. Diagnostics use the held-out-ID-selected
+> checkpoint and report counterfactual red/green recoloring sensitivity; spatial
+> attribution maps alone do not establish shape-versus-color dependence.
+> Full corrected sweeps have not yet been run.
+
+
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.x-ee4c2c.svg)](https://pytorch.org/)
 [![uv](https://img.shields.io/badge/pkg-uv-black.svg)](https://docs.astral.sh/uv/)
@@ -105,7 +118,7 @@ uv run python scripts/make_diagnostics.py --config configs/fast.yaml --out outpu
 | heavy | `ablate.py` (full) + diagnostics | ~4–6 h | full results, overnight |
 
 > IRMv1 requires `--steps` above the annealing threshold (190): below it the penalty
-> is exactly 0 and every method degenerates to ERM.
+> is exactly 0 and IRMv1 has the ERM objective. V-REx remains penalized.
 
 ---
 

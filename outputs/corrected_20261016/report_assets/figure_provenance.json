@@ -1,0 +1,152 @@
+{
+  "erm": {
+    "seed": 0,
+    "protocol": "trainval",
+    "step": 200,
+    "ece": 0.6638037068724633,
+    "n": 10000,
+    "checkpoint": "C:\\Users\\toant\\Desktop\\explanable_ai\\spurious-correlations-invariant-learning\\outputs\\corrected_20261016\\sweep\\erm_s0\\trainval.pt",
+    "calibration_bins": [
+      {
+        "confidence": 0.5188694596290588,
+        "accuracy": 0.3050847457627119,
+        "n": 177
+      },
+      {
+        "confidence": 0.5728000402450562,
+        "accuracy": 0.08136482939632546,
+        "n": 762
+      },
+      {
+        "confidence": 0.6350818872451782,
+        "accuracy": 0.037783375314861464,
+        "n": 1588
+      },
+      {
+        "confidence": 0.6993491649627686,
+        "accuracy": 0.038419913419913417,
+        "n": 1848
+      },
+      {
+        "confidence": 0.7635250091552734,
+        "accuracy": 0.04962610469068661,
+        "n": 1471
+      },
+      {
+        "confidence": 0.8315622210502625,
+        "accuracy": 0.07074569789674952,
+        "n": 1046
+      },
+      {
+        "confidence": 0.9035186767578125,
+        "accuracy": 0.19528071602929212,
+        "n": 1229
+      },
+      {
+        "confidence": 0.9603152871131897,
+        "accuracy": 0.2474720596061735,
+        "n": 1879
+      }
+    ]
+  },
+  "irm": {
+    "seed": 0,
+    "protocol": "trainval",
+    "step": 200,
+    "ece": 0.3762319575667381,
+    "n": 10000,
+    "checkpoint": "C:\\Users\\toant\\Desktop\\explanable_ai\\spurious-correlations-invariant-learning\\outputs\\corrected_20261016\\sweep\\irm_s0\\trainval.pt",
+    "calibration_bins": [
+      {
+        "confidence": 0.514762818813324,
+        "accuracy": 0.3217204301075269,
+        "n": 2325
+      },
+      {
+        "confidence": 0.5623993277549744,
+        "accuracy": 0.4000684462696783,
+        "n": 2922
+      },
+      {
+        "confidence": 0.6302973628044128,
+        "accuracy": 0.11652035115722266,
+        "n": 1253
+      },
+      {
+        "confidence": 0.7012381553649902,
+        "accuracy": 0.12255541069100391,
+        "n": 767
+      },
+      {
+        "confidence": 0.7668480277061462,
+        "accuracy": 0.17155425219941348,
+        "n": 682
+      },
+      {
+        "confidence": 0.8335063457489014,
+        "accuracy": 0.22115384615384615,
+        "n": 728
+      },
+      {
+        "confidence": 0.8997411727905273,
+        "accuracy": 0.2349570200573066,
+        "n": 698
+      },
+      {
+        "confidence": 0.9628009796142578,
+        "accuracy": 0.2656,
+        "n": 625
+      }
+    ]
+  },
+  "rex": {
+    "seed": 0,
+    "protocol": "trainval",
+    "step": 2000,
+    "ece": 0.3877736311376095,
+    "n": 10000,
+    "checkpoint": "C:\\Users\\toant\\Desktop\\explanable_ai\\spurious-correlations-invariant-learning\\outputs\\corrected_20261016\\sweep\\rex_s0\\trainval.pt",
+    "calibration_bins": [
+      {
+        "confidence": 0.5152686834335327,
+        "accuracy": 0.5084581923634606,
+        "n": 2069
+      },
+      {
+        "confidence": 0.5616613030433655,
+        "accuracy": 0.40766002098635884,
+        "n": 1906
+      },
+      {
+        "confidence": 0.6310610175132751,
+        "accuracy": 0.20238095238095238,
+        "n": 1176
+      },
+      {
+        "confidence": 0.6993685364723206,
+        "accuracy": 0.14003944773175542,
+        "n": 1014
+      },
+      {
+        "confidence": 0.7670238614082336,
+        "accuracy": 0.15814850530376084,
+        "n": 1037
+      },
+      {
+        "confidence": 0.8343082666397095,
+        "accuracy": 0.19203187250996015,
+        "n": 1255
+      },
+      {
+        "confidence": 0.8976576328277588,
+        "accuracy": 0.21236559139784947,
+        "n": 1116
+      },
+      {
+        "confidence": 0.9545315504074097,
+        "accuracy": 0.25995316159250587,
+        "n": 427
+      }
+    ]
+  }
+}

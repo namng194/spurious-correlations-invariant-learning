@@ -1,0 +1,16 @@
+{
+  "state": "complete",
+  "stage": "finished",
+  "updated_utc": "2026-10-15T19:38:18.761330+00:00",
+  "main_completed_runs": 9,
+  "main_expected_runs": 9,
+  "ablation_completed_runs": 54,
+  "ablation_expected_runs": 54,
+  "ablation_reused_runs": 12,
+  "ablation_expected_new_training_runs": 42,
+  "diagnostic_seeds": [
+    0,
+    1,
+    2
+  ]
+}

@@ -3,6 +3,7 @@
 All methods share the same per-env BCE risk. The IRMv1 penalty uses the
 dummy-classifier trick: R^e(w * Phi) with w=1.0, penalty = ||grad_w R^e||^2.
 """
+
 from __future__ import annotations
 
 import torch
@@ -39,12 +40,11 @@ def compute_objective(
         # lite version: minimize worst-env risk (Sagawa et al. 2019, static form)
         return risks.max(), {**info, "worst_risk": risks.max().detach()}
     if method == "rex":
+        # V-REx is active from step one; anneal_steps applies only to IRMv1.
         obj = mean_risk + rex_beta * risks.var(unbiased=False)
         return obj, {**info, "risk_var": risks.var(unbiased=False).detach()}
     if method == "irm":
-        pens = torch.stack(
-            [irmv1_penalty(l, y) for l, y in zip(logits_per_env, y_per_env)]
-        )
+        pens = torch.stack([irmv1_penalty(l, y) for l, y in zip(logits_per_env, y_per_env)])
         obj = mean_risk + lam * pens.sum()
         return obj, {**info, "penalty": pens.sum().detach()}
     raise ValueError(f"unknown method {method!r}")

@@ -3,6 +3,25 @@ __pycache__/
 .pytest_cache/
 *.pyc
 data/
-outputs/sweep/
 *.pt
 .ipynb_checkpoints/
+
+# macOS
+.DS_Store
+._*
+
+# LaTeX intermediate / build artifacts
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.log
+*.lot
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+*.xdv

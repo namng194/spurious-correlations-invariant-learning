@@ -2,6 +2,8 @@
 # run_sweep.py dùng: methods x seeds. ablate.py dùng: lambda_sweep, backbones, failures.
 data:
   data_dir: data
+  val_fraction: 0.2
+  split_seed: 0
   label_noise: 0.25
   seed: 0
   batch_size: 2048
@@ -20,6 +22,7 @@ methods:
   groupdro: {}
 ablate:
   lambda_sweep: [100.0, 1000.0, 10000.0, 30000.0]
+  rex_beta_sweep: [100.0, 1000.0, 10000.0]
   backbones: [mlp, cnn]
   patch_p_e: 0.1        # spurious thứ 2 cho failure demo E <= |Psi_s|
   small_n: 6250         # sample-size ablation per env

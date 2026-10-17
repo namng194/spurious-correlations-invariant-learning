@@ -1,4 +1,5 @@
 """Viz helpers: reliability diagram, sample grid, saliency maps."""
+
 from __future__ import annotations
 
 import matplotlib.pyplot as plt
@@ -31,7 +32,7 @@ def reliability_diagram(p, y, n_bins: int = 15, path: str | None = None):
         m = (conf > lo) & (conf <= hi) if b > 0 else (conf <= hi)
         if m.any():
             xs.append((lo + hi) / 2)
-            accs.append(pred[m].mean())
+            accs.append((pred[m] == y[m]).mean())
             confs.append(conf[m].mean())
     fig, ax = plt.subplots(figsize=(4, 4))
     ax.plot([0, 1], [0, 1], "--", label="perfect")
@@ -53,3 +54,29 @@ def saliency(model, x: torch.Tensor, device: str) -> np.ndarray:
     s = model(x).sum()
     g = torch.autograd.grad(s, x)[0].detach().cpu().squeeze(0)
     return g.abs().sum(0).numpy()
+
+
+@torch.enable_grad()
+def integrated_gradients(
+    model, x: torch.Tensor, device: str, baseline: torch.Tensor | None = None, steps: int = 32
+) -> np.ndarray:
+    """Integrated Gradients (Sundararajan et al. 2017) summed over channels.
+
+    Integrates gradients along the straight path baseline -> x. Spatial maps
+    alone cannot distinguish shape dependence from color dependence and do not
+    replace attribution sanity checks.
+    Returns (28,28) non-negative attribution map.
+    """
+    model.eval()
+    if baseline is None:
+        baseline = torch.zeros_like(x)
+    x0 = baseline.unsqueeze(0).to(device)
+    x1 = x.unsqueeze(0).to(device)
+    grads = torch.zeros_like(x1)
+    for k in range(1, steps + 1):
+        xk = (x0 + (x1 - x0) * k / steps).detach().requires_grad_(True)
+        s = model(xk).sum()
+        g = torch.autograd.grad(s, xk)[0].detach()
+        grads += g
+    ig = (x1 - x0) * grads / steps
+    return ig.squeeze(0).cpu().abs().sum(0).numpy()

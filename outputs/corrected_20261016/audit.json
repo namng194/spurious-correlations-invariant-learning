@@ -1,0 +1,32 @@
+{
+  "passed": true,
+  "main_protocol_rows": 27,
+  "ablation_entries": 54,
+  "unique_training_runs": 51,
+  "reused_ablation_entries": 12,
+  "diagnostic_seeds": [
+    0,
+    1,
+    2
+  ],
+  "report_table_files": [
+    "backbone_env.tex",
+    "diagnostics.tex",
+    "group_accuracy.tex",
+    "main.tex",
+    "protocol.tex",
+    "robust_transfer.tex",
+    "sweep.tex",
+    "sweep_seeds.tex"
+  ],
+  "report_figures": [
+    "acc_bar.png",
+    "ig_erm_vs_irm.png",
+    "recoloring.png",
+    "reliability_erm.png",
+    "reliability_irm.png",
+    "reliability_rex.png",
+    "saliency_erm_vs_irm.png"
+  ],
+  "note": "Assets are replacements; report prose and PDFs still require updating."
+}
